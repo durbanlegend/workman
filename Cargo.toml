@@ -1,0 +1,40 @@
+[package]
+name = "workman"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+authors = ["Don Forbes <don.forbes3@gmail.com>"]
+description = "A fast, lightweight, multi-lingual GUI markdown viewer"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/durbanlegend/workman"
+readme = "README.md"
+keywords = ["markdown", "viewer", "gui", "egui"]
+categories = ["command-line-utilities", "gui"]
+
+[[bin]]
+name = "workman"
+path = "src/main.rs"
+
+[dependencies]
+eframe = { version = "0.36", features = ["wgpu"] }
+# NOTE: a git dependency prevents publishing to crates.io. Switch to a crates.io
+# release of egui_commonmark once it contains the required changes.
+egui_commonmark = { git = "https://github.com/durbanlegend/egui_commonmark", features = ["better_syntax_highlighting", "svg", "fetch"] }
+egui_extras = { version = "0.36", features = ["svg", "syntect"] }
+resvg = { version = "0.45", features = ["text"] }
+fontdb = { version = "0.23", features = ["fs"] }
+log = "0.4"
+notify = "8"
+pulldown-cmark = "0.13"
+rfd = "0.15"
+rust-i18n = "4"
+sys-locale = "0.3"
+
+# Keep dev builds fast enough to be usable for a GUI app.
+[profile.dev]
+opt-level = 3
+debug = true
+
+[profile.release]
+lto = "thin"
+strip = true
