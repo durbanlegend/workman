@@ -1,28 +1,3 @@
-/*[toml]
-[dependencies]
-eframe = { version = "0.36", features = ["wgpu"] }
-# egui_commonmark = { git = "https://github.com/durbanlegend/egui_commonmark", features = ["better_syntax_highlighting", "svg", "fetch"] }
-egui_commonmark = { path = "/Users/donf/projects/egui_commonmark/egui_commonmark", features = ["better_syntax_highlighting", "svg", "fetch"] }
-
-egui_extras = { version = "0.36", features = ["svg", "syntect"] }
-thag_proc_macros = { version = "1, thag-auto" }
-# thag_styling = { version = "1, thag-auto", features = ["inquire_theming"] }
-resvg = { version = "0.45", features = ["text"] }
-fontdb = { version = "0.23", features = ["fs"] }
-notify = { version = "8" }
-pulldown-cmark = { version = "0.13" }
-rfd = { version = "0.15" }
-rust-i18n = "4"
-sys-locale = "0.3"
-
-[features]
-default = ["eframe/wgpu","egui_commonmark/svg","egui_commonmark/fetch"]
-
-# Make sure the result runs fast
-[profile.dev]
-opt-level = 3       # Apply maximum performance optimizations
-debug = true
-*/
 /// A fast lightweight multi-lingual GUI markdown viewer.
 ///
 /// Relative links are resolved relative to the parent directory of the
@@ -776,10 +751,11 @@ fn main() -> eframe::Result<()> {
         renderer: eframe::Renderer::Wgpu,
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1200.0, 800.0])
-            .with_title(format!(
-                "workman: {}",
-                canonical_initial_path.display()
-            )),
+            .with_icon(
+                eframe::icon_data::from_png_bytes(include_bytes!("../assets/icon.png"))
+                    .expect("assets/icon.png is a valid PNG"),
+            )
+            .with_title(format!("workman: {}", canonical_initial_path.display())),
         ..Default::default()
     };
 
@@ -1310,12 +1286,12 @@ impl MarkdownApp {
         }
     }
 
-    fn remove_search(&mut self, id: &egui::Id) {
+    fn remove_search(&mut self, id: egui::Id) {
         let search_query_mut = self.cache.search_query_mut(&id);
         let last_search_query = search_query_mut.clone();
         // Remove search matches
         *search_query_mut = String::new();
-        self.cache.update_search_matches(id, &self.content);
+        self.cache.update_search_matches(&id, &self.content);
         // Restore search box contents for when box is reopened
         *self.cache.search_query_mut(&id) = last_search_query;
     }
@@ -1447,7 +1423,7 @@ impl eframe::App for MarkdownApp {
             eprintln!("Exiting app");
             ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
         } else if close_file_key {
-            nav_action = NavAction::Close(ui.ctx().clone())
+            nav_action = NavAction::Close(ui.ctx().clone());
         } else if open_key {
             open_files_requested = true;
         } else if !wants_text {
@@ -1487,7 +1463,7 @@ impl eframe::App for MarkdownApp {
                 // Opening the bar — request focus for the text field.
                 self.search_focus = true;
             } else {
-                self.remove_search(&id);
+                self.remove_search(id);
             }
         }
         if cmd_r && self.current_file_path.is_file() {
@@ -1499,7 +1475,7 @@ impl eframe::App for MarkdownApp {
         // Esc should close the search box and remove the search.
         if new_search_open && search_escape {
             new_search_open = false;
-            self.remove_search(&id);
+            self.remove_search(id);
         }
 
         // ── Top panel: toolbar ────────────────────────────────────────────────────────────

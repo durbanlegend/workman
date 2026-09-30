@@ -1,5 +1,7 @@
 # workman
 
+![workman logo](assets/icon.png)
+
 A fast, lightweight, multi-lingual GUI markdown viewer, built with [egui](https://github.com/emilk/egui).
 
 ## Features
