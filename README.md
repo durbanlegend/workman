@@ -1,12 +1,14 @@
 # workman
 
-![workman logo](assets/icon.png)
+![The pun only works in English](assets/icon.png)
 
 A fast, lightweight, multi-lingual GUI markdown viewer, built with [egui](https://github.com/emilk/egui).
 
 ## Features
 
 - Support for 28 languages, according to your `LOCALE` or `LANG` environment variable, e.g. `LOCALE=fr`.
+
+- Cross-platform.
 
 - Multi-file navigation: files can be selected or dragged and dropped singly or in batches.
 
@@ -25,6 +27,29 @@ A fast, lightweight, multi-lingual GUI markdown viewer, built with [egui](https:
 - Automatic live file watching and refresh.
 
 Relative links are resolved relative to the parent directory of the current markdown file, so navigation between linked documents works correctly.
+
+## Supported languages
+
+The interface language is chosen from your `LOCALE` or `LANG` environment variable, e.g. `LOCALE=fr`, falling back to English.
+
+The following languages are currently supported. Please report any mistakes in the AI-provided translations as issues on the `workman` GitHub repo. 
+
+| Code | Language | Code | Language |
+|------|----------|------|----------|
+| `af` | Afrikaans | `it` | Italiano
+| `bg` | Български | `nb`, `no`  | Norsk |
+| `ca` | Català | `nl` | Nederlands |
+| `cs` | Čeština | `pl` | Polski |
+| `cy` | Cymraeg | `pt` | Português |
+| `da` | Dansk | `ro` | Română |
+| `de` | Deutsch | `ru` | Русский |
+| `el` | Ελληνικά | `sk` | Slovenčina |
+| `en` | English | `sl` | Slovenščina |
+| `es` | Español | `st` | Sesotho |
+| `fi` | Suomi | `sv` | Svenska |
+| `fr` | Français | `uk` | Українська |
+| `hr` | Hrvatski | `xh` | isiXhosa |
+| `hu` | Magyar | `zu` | isiZulu |
 
 ## Installation
 

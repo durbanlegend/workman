@@ -5,6 +5,7 @@
 ///
 /// Features:
 /// - Support for 28 languages, according to your LOCALE or LANG system/environment variable. E.g. LOCALE=fr.
+/// - Cross-platform.
 /// - Multi-file navigation: files can be selected or dragged and dropped singly or in batches as and when needed.
 /// - Large document support.
 /// - Light/dark/system theme switching.
@@ -609,7 +610,7 @@ fn detach_if_tty() {
 /// `GetUserDefaultLocaleName` on Windows, POSIX env-vars on Linux).
 /// Falls back to `"en"` when no usable locale is detected.
 fn detect_locale() -> String {
-    env::var("LOCALE").unwrap_or_else(|_| {
+    let locale = env::var("LOCALE").unwrap_or_else(|_| {
         // eprintln!("No LOCALE env var");
         env::var("LANG").unwrap_or_else(|_| {
             eprintln!("No LANG env var");
@@ -617,7 +618,12 @@ fn detect_locale() -> String {
                 .filter(|loc| !loc.is_empty() && loc != "C" && loc != "POSIX")
                 .unwrap_or_else(|| "en".to_string())
         })
-    })
+    });
+    match locale.as_str() {
+        "no" | "no-NO" => "nb",
+        other => other,
+    }
+    .to_string()
 }
 
 #[allow(clippy::cast_precision_loss, clippy::too_many_lines)]

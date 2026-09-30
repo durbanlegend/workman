@@ -3,16 +3,16 @@ _version: 2
 # Keys use the dot-separated paths matching the t!() macro calls in the source.
 #
 # Locales:
-#   af  Afrikaans      bg  Bulgarian      ca  Catalan
-#   cs  Czech          cy  Welsh          da  Danish
-#   de  German         el  Greek          en  English
-#   es  Spanish        fi  Finnish        fr  French
-#   hr  Croatian       hu  Hungarian      it  Italian
-#   nb  Norwegian      nl  Dutch          no  Norwegian
-#   pl  Polish         pt  Portuguese     ro  Romanian
-#   ru  Russian        sk  Slovak         sl  Slovenian
-#   st  Sesotho        sv  Swedish        uk  Ukrainian
-#   xh  Xhosa          zu  Zulu
+#   af      Afrikaans      bg  Bulgarian      ca  Catalan
+#   cs      Czech          cy  Welsh          da  Danish
+#   de      German         el  Greek          en  English
+#   es      Spanish        fi  Finnish        fr  French
+#   hr      Croatian       hu  Hungarian      it  Italian
+#   nb,no   Norwegian      nl  Dutch          pl  Polish
+#   pt      Portuguese     ro  Romanian       ru  Russian
+#   sk      Slovak         sl  Slovenian      st  Sesotho
+#   sv      Swedish        uk  Ukrainian      xh  Xhosa
+#   zu      Zulu
 #
 # NOTE: Zulu (zu), Sesotho (st) and Xhosa (xh) translations are a best-effort
 # first pass; review by native speakers is recommended before considering them
@@ -36,7 +36,6 @@ toolbar.contrast_restore:
   it: "Ripristina il contrasto egui predefinito"
   nb: "Gjenopprett standard egui-kontrast"
   nl: "Standaard egui-contrast herstellen"
-  no: "Gjenopprett standard egui-kontrast"
   pl: "Przywróć domyślny kontrast egui"
   pt: "Restaurar o contraste padrão do egui"
   ro: "Restaurați contrastul implicit egui"
@@ -67,7 +66,6 @@ toolbar.contrast_apply:
   it: "Applica colori ad alto contrasto"
   nb: "Bruk høykontrastfarger"
   nl: "Hoog-contrastkleuren toepassen"
-  no: "Bruk høykontrastfarger"
   pl: "Zastosuj kolory wysokiego kontrastu"
   pt: "Aplicar cores de alto contraste"
   ro: "Aplicați culori cu contrast ridicat"
@@ -98,7 +96,6 @@ toolbar.close_file_tip:
   it: "Chiudi file corrente (%{cmd}-W)"
   nb: "Lukk gjeldende fil (%{cmd}-W)"
   nl: "Huidig bestand sluiten (%{cmd}-W)"
-  no: "Lukk gjeldende fil (%{cmd}-W)"
   pl: "Zamknij bieżący plik (%{cmd}-W)"
   pt: "Fechar ficheiro atual (%{cmd}-W)"
   ro: "Închide fișierul curent (%{cmd}-W)"
@@ -129,7 +126,6 @@ toolbar.open_files:
   it: "Apri file markdown (%{cmd}-O)"
   nb: "Åpne markdown-filer (%{cmd}-O)"
   nl: "Markdown-bestanden openen (%{cmd}-O)"
-  no: "Åpne markdown-filer (%{cmd}-O)"
   pl: "Otwórz pliki markdown (%{cmd}-O)"
   pt: "Abrir ficheiros markdown (%{cmd}-O)"
   ro: "Deschide fișiere markdown (%{cmd}-O)"
@@ -160,7 +156,6 @@ toolbar.reload:
   it: "Ricarica il file corrente dal disco (%{cmd}-R)"
   nb: "Last inn gjeldende fil fra disk på nytt (%{cmd}-R)"
   nl: "Huidig bestand opnieuw laden van schijf (%{cmd}-R)"
-  no: "Last inn gjeldende fil fra disk på nytt (%{cmd}-R)"
   pl: "Przeładuj bieżący plik z dysku (%{cmd}-R)"
   pt: "Recarregar o arquivo atual do disco (%{cmd}-R)"
   ro: "Reîncărcați fișierul curent de pe disc (%{cmd}-R)"
@@ -191,7 +186,6 @@ toolbar.toc_toggle:
   it: "Mostra/nascondi sommario (%{cmd}-T)"
   nb: "Vis/skjul innholdsfortegnelse (%{cmd}-T)"
   nl: "Inhoudsopgave in-/uitschakelen (%{cmd}-T)"
-  no: "Vis/skjul innholdsfortegnelse (%{cmd}-T)"
   pl: "Pokaż/ukryj spis treści (%{cmd}-T)"
   pt: "Alternar o índice (%{cmd}-T)"
   ro: "Comutați cuprinsul (%{cmd}-T)"
@@ -222,7 +216,6 @@ toolbar.search_toggle:
   it: "Cerca (%{cmd}-F)"
   nb: "Søk (%{cmd}-F)"
   nl: "Zoeken (%{cmd}-F)"
-  no: "Søk (%{cmd}-F)"
   pl: "Szukaj (%{cmd}-F)"
   pt: "Pesquisar (%{cmd}-F)"
   ro: "Căutare (%{cmd}-F)"
@@ -253,7 +246,6 @@ toolbar.close:
   it: "Chiudi (%{cmd}-Q)"
   nb: "Lukk (%{cmd}-Q)"
   nl: "Sluiten (%{cmd}-Q)"
-  no: "Lukk (%{cmd}-Q)"
   pl: "Zamknij (%{cmd}-Q)"
   pt: "Fechar (%{cmd}-Q)"
   ro: "Închideți (%{cmd}-Q)"
@@ -284,7 +276,6 @@ toolbar.help:
   it: "Aiuto (F1)"
   nb: "Hjelp (F1)"
   nl: "Help (F1)"
-  no: "Hjelp (F1)"
   pl: "Pomoc (F1)"
   pt: "Ajuda (F1)"
   ro: "Ajutor (F1)"
@@ -315,7 +306,6 @@ toolbar.font_enlarge:
   it: "Aumenta il carattere (%{cmd}-Maiusc-A)"
   nb: "Forstørr skrift (%{cmd}-Shift-A)"
   nl: "Lettertype vergroten (%{cmd}-Shift-A)"
-  no: "Forstørr skrift (%{cmd}-Shift-A)"
   pl: "Powiększ czcionkę (%{cmd}-Shift-A)"
   pt: "Aumentar fontes (%{cmd}-Shift-A)"
   ro: "Măriți fonturile (%{cmd}-Shift-A)"
@@ -346,7 +336,6 @@ toolbar.font_reset:
   it: "Reimposta la dimensione del carattere al 100% (%{cmd}-0)"
   nb: "Tilbakestill skriftstørrelse til 100% (%{cmd}-0)"
   nl: "Lettergrootte terugzetten naar 100% (%{cmd}-0)"
-  no: "Tilbakestill skriftstørrelse til 100% (%{cmd}-0)"
   pl: "Resetuj rozmiar czcionki do 100% (%{cmd}-0)"
   pt: "Redefinir tamanho da fonte para 100% (%{cmd}-0)"
   ro: "Resetați dimensiunea fontului la 100% (%{cmd}-0)"
@@ -377,7 +366,6 @@ toolbar.font_reduce:
   it: "Riduci il carattere (%{cmd}-a)"
   nb: "Forminsk skrift (%{cmd}-a)"
   nl: "Lettertype verkleinen (%{cmd}-a)"
-  no: "Forminsk skrift (%{cmd}-a)"
   pl: "Zmniejsz czcionkę (%{cmd}-a)"
   pt: "Reduzir fontes (%{cmd}-a)"
   ro: "Micșorați fonturile (%{cmd}-a)"
@@ -408,7 +396,6 @@ toolbar.zoom_in:
   it: "Ingrandisci (%{cmd}-=)"
   nb: "Zoom inn (%{cmd}-=)"
   nl: "Inzoomen (%{cmd}-=)"
-  no: "Zoom inn (%{cmd}-=)"
   pl: "Przybliż (%{cmd}-=)"
   pt: "Ampliar (%{cmd}-=)"
   ro: "Măriți (%{cmd}-=)"
@@ -439,7 +426,6 @@ toolbar.zoom_reset:
   it: "Reimposta lo zoom al 100% (%{cmd}-Z)"
   nb: "Tilbakestill zoom til 100% (%{cmd}-Z)"
   nl: "Zoom terugzetten naar 100% (%{cmd}-Z)"
-  no: "Tilbakestill zoom til 100% (%{cmd}-Z)"
   pl: "Resetuj powiększenie do 100% (%{cmd}-Z)"
   pt: "Redefinir zoom para 100% (%{cmd}-Z)"
   ro: "Resetați zoom-ul la 100% (%{cmd}-Z)"
@@ -470,7 +456,6 @@ toolbar.zoom_out:
   it: "Riduci (%{cmd}-−)"
   nb: "Zoom ut (%{cmd}-−)"
   nl: "Uitzoomen (%{cmd}-−)"
-  no: "Zoom ut (%{cmd}-−)"
   pl: "Oddal (%{cmd}-−)"
   pt: "Reduzir zoom (%{cmd}-−)"
   ro: "Micșorați (%{cmd}-−)"
@@ -501,7 +486,6 @@ toolbar.theme_system:
   it: "Segui il tema di sistema"
   nb: "Følg systemets tema"
   nl: "Systeemthema volgen"
-  no: "Følg systemets tema"
   pl: "Podążaj za motywem systemowym"
   pt: "Seguir tema do sistema"
   ro: "Urmați tema sistemului"
@@ -532,7 +516,6 @@ toolbar.theme_dark:
   it: "Passa alla modalità scura"
   nb: "Bytt til mørk modus"
   nl: "Overschakelen naar donkere modus"
-  no: "Bytt til mørk modus"
   pl: "Przełącz na tryb ciemny"
   pt: "Mudar para modo escuro"
   ro: "Comutați la modul întunecat"
@@ -563,7 +546,6 @@ toolbar.theme_light:
   it: "Passa alla modalità chiara"
   nb: "Bytt til lys modus"
   nl: "Overschakelen naar lichte modus"
-  no: "Bytt til lys modus"
   pl: "Przełącz na tryb jasny"
   pt: "Mudar para modo claro"
   ro: "Comutați la modul luminos"
@@ -594,7 +576,6 @@ status.reloaded:
   it: "↻ Ricaricato"
   nb: "↻ Lastet inn på nytt"
   nl: "↻ Opnieuw geladen"
-  no: "↻ Lastet inn på nytt"
   pl: "↻ Przeładowano"
   pt: "↻ Recarregado"
   ro: "↻ Reîncărcat"
@@ -625,7 +606,6 @@ status.reloaded_tip:
   it: "File modificato su disco — ricaricato automaticamente"
   nb: "Filen ble endret på disk — lastet inn på nytt automatisk"
   nl: "Bestand gewijzigd op schijf — automatisch opnieuw geladen"
-  no: "Filen ble endret på disk — lastet inn på nytt automatisk"
   pl: "Plik zmieniony na dysku — przeładowany automatycznie"
   pt: "Arquivo alterado no disco — recarregado automaticamente"
   ro: "Fișierul s-a modificat pe disc — reîncărcat automat"
@@ -656,7 +636,6 @@ status.cached:
   it: "⚡ in cache"
   nb: "⚡ bufret"
   nl: "⚡ gecached"
-  no: "⚡ bufret"
   pl: "⚡ zbuforowane"
   pt: "⚡ em cache"
   ro: "⚡ în cache"
@@ -687,7 +666,6 @@ status.cached_tip:
   it: "Cache del viewport ATTIVA — più veloce per documenti grandi, potrebbe avere piccoli artefatti di scorrimento.\nFai clic per passare alla modalità di rendering completo."
   nb: "Visningsvindu-buffer PÅ — raskere for store dokumenter, kan ha mindre rulleartefakter.\nKlikk for å bytte til full-gjengivelses-modus."
   nl: "Viewport-cache AAN — sneller voor grote documenten, kan kleine scroll-artefacten hebben.\nKlik om naar de volledige weergavemodus te schakelen."
-  no: "Visningsvindu-buffer PÅ — raskere for store dokumenter, kan ha mindre rulleartefakter.\nKlikk for å bytte til full-gjengivelses-modus."
   pl: "Pamięć podręczna widoku WŁĄCZONA — szybsza dla dużych dokumentów, mogą wystąpić drobne artefakty przewijania.\nKliknij, aby przełączyć się do trybu pełnego renderowania."
   pt: "Cache de visualização ATIVADO — mais rápido para documentos grandes, pode ter pequenos artefatos de rolagem.\nClique para mudar para o modo de renderização completa."
   ro: "Cache viewport ACTIVAT — mai rapid pentru documente mari, poate avea artefacte minore de derulare.\nFaceți clic pentru a comuta la modul de redare completă."
@@ -718,7 +696,6 @@ status.plain:
   it: "🐢 normale"
   nb: "🐢 vanlig"
   nl: "🐢 gewoon"
-  no: "🐢 vanlig"
   pl: "🐢 zwykły"
   pt: "🐢 normal"
   ro: "🐢 simplu"
@@ -749,7 +726,6 @@ status.plain_tip:
   it: "Cache del viewport DISATTIVA — scorrimento fluido, ma scarsa risposta per documenti grandi.\nFai clic per abilitare la cache per la velocità con documenti grandi."
   nb: "Visningsvindu-buffer AV — jevn rulling, men dårlig respons for store dokumenter.\nKlikk for å aktivere buffer for stor-dokument-hastighet."
   nl: "Viewport-cache UIT — soepel scrollen, maar slechte respons voor grote documenten.\nKlik om cache in te schakelen voor snelheid bij grote documenten."
-  no: "Visningsvindu-buffer AV — jevn rulling, men dårlig respons for store dokumenter.\nKlikk for å aktivere buffer for stor-dokument-hastighet."
   pl: "Pamięć podręczna widoku WYŁĄCZONA — płynne przewijanie, ale słaba odpowiedź dla dużych dokumentów.\nKliknij, aby włączyć pamięć podręczną dla szybkości z dużymi dokumentami."
   pt: "Cache de visualização DESATIVADO — rolagem suave, mas resposta ruim para documentos grandes.\nClique para ativar o cache para velocidade com documentos grandes."
   ro: "Cache viewport DEZACTIVAT — derulare fluidă, dar răspuns slab pentru documente mari.\nFaceți clic pentru a activa cache-ul pentru viteză cu documente mari."
@@ -780,7 +756,6 @@ status.large_file_tip:
   it: "File grande — la resa iniziale è lenta. La reattività allo scorrimento migliora una volta che il documento è completamente impaginato."
   nb: "Stor fil — første gjengivelse er treg. Rulleresponsen forbedres når dokumentet er fullt lagt ut."
   nl: "Groot bestand — het eerste renderen is traag. De scrollresponsiviteit verbetert zodra het document volledig is opgemaakt."
-  no: "Stor fil — første gjengivelse er treg. Rulleresponsen forbedres når dokumentet er fullt lagt ut."
   pl: "Duży plik — pierwsze renderowanie jest wolne. Responsywność przewijania poprawia się po całkowitym załadowaniu dokumentu."
   pt: "Arquivo grande — a renderização inicial é lenta. A resposta de rolagem melhora após o documento ser completamente carregado."
   ro: "Fișier mare — redarea inițială este lentă. Capacitatea de reacție la derulare se îmbunătățește odată ce documentul este complet afișat."
@@ -811,7 +786,6 @@ search.placeholder:
   it: "Cerca nel documento…"
   nb: "Finn i dokument…"
   nl: "Zoeken in document…"
-  no: "Finn i dokument…"
   pl: "Szukaj w dokumencie…"
   pt: "Pesquisar no documento…"
   ro: "Găsiți în document…"
@@ -842,7 +816,6 @@ search.case_sensitive_tip:
   it: "Ricerca con distinzione tra maiuscole e minuscole"
   nb: "Søk med store/små bokstaver"
   nl: "Hoofdlettergevoelig zoeken"
-  no: "Søk med store/små bokstaver"
   pl: "Wyszukiwanie z rozróżnianiem wielkości liter"
   pt: "Pesquisa sensível a maiúsculas"
   ro: "Căutare cu distincție de majuscule"
@@ -873,7 +846,6 @@ search.whole_word_tip:
   it: "Corrispondenza parole intere"
   nb: "Samsvar med hele ord"
   nl: "Hele woorden zoeken"
-  no: "Samsvar med hele ord"
   pl: "Dopasowuj całe słowa"
   pt: "Corresponder palavras inteiras"
   ro: "Potriviți cuvinte întregi"
@@ -904,7 +876,6 @@ search.regex_tip:
   it: "Usa espressioni regolari"
   nb: "Bruk regulære uttrykk"
   nl: "Reguliere expressies gebruiken"
-  no: "Bruk regulære uttrykk"
   pl: "Użyj wyrażeń regularnych"
   pt: "Usar expressões regulares"
   ro: "Utilizați expresii regulate"
@@ -935,7 +906,6 @@ search.no_matches:
   it: "Nessun risultato"
   nb: "Ingen treff"
   nl: "Geen resultaten"
-  no: "Ingen treff"
   pl: "Brak wyników"
   pt: "Sem resultados"
   ro: "Nicio potrivire"
@@ -966,7 +936,6 @@ search.prev_tip:
   it: "Risultato precedente (Maiusc-Invio)"
   nb: "Forrige treff (Shift-Enter)"
   nl: "Vorige overeenkomst (Shift-Enter)"
-  no: "Forrige treff (Shift-Enter)"
   pl: "Poprzedni wynik (Shift-Enter)"
   pt: "Correspondência anterior (Shift-Enter)"
   ro: "Potrivire anterioară (Shift-Enter)"
@@ -997,7 +966,6 @@ search.next_tip:
   it: "Risultato successivo (Invio)"
   nb: "Neste treff (Enter)"
   nl: "Volgende overeenkomst (Enter)"
-  no: "Neste treff (Enter)"
   pl: "Następny wynik (Enter)"
   pt: "Próxima correspondência (Enter)"
   ro: "Potrivire următoare (Enter)"
@@ -1028,7 +996,6 @@ search.close_tip:
   it: "Chiudi la ricerca (Esc)"
   nb: "Lukk søk (Esc)"
   nl: "Zoeken sluiten (Esc)"
-  no: "Lukk søk (Esc)"
   pl: "Zamknij wyszukiwanie (Esc)"
   pt: "Fechar pesquisa (Esc)"
   ro: "Închideți căutarea (Esc)"
@@ -1059,7 +1026,6 @@ welcome.instruction:
   it: "# Benvenuto!\n\nApri uno o più file markdown trascinandoli e rilasciandoli su questo pannello, oppure usando %{cmd}-O o facendo clic sull'icona %{open_files} nella barra degli strumenti per selezionarli.\n\nNaviga tra i file aperti utilizzando i pulsanti %{hist_back} e %{hist_forward}."
   nb: "# Velkommen!\n\nÅpne en eller flere markdown-filer ved å dra og slippe dem på dette panelet, eller ved å bruke %{cmd}-O eller klikke på ikonet %{open_files} i verktøylinjen for å velge dem.\n\nNaviger mellom åpne filer med knappene %{hist_back} og %{hist_forward}."
   nl: "# Welkom!\n\nOpen een of meer markdown-bestanden door ze naar dit paneel te slepen en neer te zetten, of door %{cmd}-O te gebruiken of op het pictogram %{open_files} in de werkbalk te klikken om ze te selecteren.\n\nNavigeer tussen geopende bestanden met de knoppen %{hist_back} en %{hist_forward}."
-  no: "# Velkommen!\n\nÅpne en eller flere markdown-filer ved å dra og slippe dem på dette panelet, eller ved å bruke %{cmd}-O eller klikke på ikonet %{open_files} i verktøylinjen for å velge dem.\n\nNaviger mellom åpne filer med knappene %{hist_back} og %{hist_forward}."
   pl: "# Witamy!\n\nOtwórz jeden lub więcej plików markdown, przeciągając je i upuszczając na ten panel, lub używając %{cmd}-O, lub klikając ikonę %{open_files} na pasku narzędzi, aby je wybrać.\n\nPrzełączaj się między otwartymi plikami za pomocą przycisków %{hist_back} i %{hist_forward}."
   pt: "# Bem-vindo!\n\nAbra um ou mais ficheiros markdown arrastando-os e largando-os neste painel, ou usando %{cmd}-O ou clicando no ícone %{open_files} na barra de ferramentas para os selecionar.\n\nNavegue entre os ficheiros abertos usando os botões %{hist_back} e %{hist_forward}."
   ro: "# Bine ați venit!\n\nDeschideți unul sau mai multe fișiere markdown trăgându-le și plasându-le pe acest panou, sau folosind %{cmd}-O sau făcând clic pe pictograma %{open_files} din bara de instrumente pentru a le selecta.\n\nNavigați între fișierele deschise folosind butoanele %{hist_back} și %{hist_forward}."
@@ -1090,7 +1056,6 @@ toc.title:
   it: "Sommario"
   nb: "Innhold"
   nl: "Inhoud"
-  no: "Innhold"
   pl: "Spis treści"
   pt: "Índice"
   ro: "Cuprins"
@@ -1121,7 +1086,6 @@ help.window_title:
   it: "Aiuto"
   nb: "Hjelp"
   nl: "Help"
-  no: "Hjelp"
   pl: "Pomoc"
   pt: "Ajuda"
   ro: "Ajutor"
@@ -1876,59 +1840,6 @@ help.text:
     | F1 | Dit helpscherm in-/uitschakelen |
     | Escape | Dit helpscherm uitschakelen |
   nb: |
-    # Markdown-visning — Hjelp
-
-    ## Tastatursnarveier
-
-    ### Fil
-    | Tast | Handling |
-    |---|---|
-    | Cmd/Ctrl-o | Åpne en Markdown-fil |
-    | Cmd/Ctrl-r | Oppdater — last inn gjeldende fil fra disk på nytt |
-    | Cmd/Ctrl-w  /  Cmd/Ctrl-q | Avslutt |
-
-    Visningen overvåker gjeldende fil for endringer og laster inn på nytt automatisk.
-
-    En kort «↻ Lastet inn på nytt»-melding vises i verktøylinjen etter hver innlasting.
-
-    ### Navigasjon
-    | Tast | Handling |
-    |---|---|
-    | Knapper ◀ / ▶ | Tilbake / Fremover i historikk |
-    | Cmd/Ctrl-t  eller  knapp § | Vis/skjul innholdsfortegnelsespanel |
-
-    ### Søk
-    | Tast | Handling |
-    |---|---|
-    | Cmd/Ctrl-f | Åpne / lukk søkefeltet |
-    | Enter  eller  knapp %{next} | Neste treff |
-    | Shift-Enter  eller  knapp %{prev} | Forrige treff |
-    | Escape | Lukk søkefeltet |
-
-    ### Zoom og Skrift
-    | Tast | Handling |
-    |---|---|
-    | Cmd/Ctrl-= | Zoom inn |
-    | Cmd/Ctrl-− | Zoom ut |
-    | Cmd/Ctrl-z | Tilbakestill zoom til 100% |
-    | Cmd/Ctrl-Shift-a | Forstørr skrift |
-    | Cmd/Ctrl-a | Forminsk skrift |
-    | Cmd/Ctrl-0 | Tilbakestill skriftstørrelse til 100% |
-
-    ### Rulling (når intet tekstfelt er fokusert)
-    | Tast | Handling |
-    |---|---|
-    | Pil opp / ned | Rull én linje |
-    | Page Up / Page Down | Rull ett visningsvindu (Fn-Opp / Fn-Ned på Mac) |
-    | Home / Cmd-Opp | Hopp til toppen av dokumentet (Fn-Venstre på Mac) |
-    | End / Cmd-Ned | Hopp til bunnen av dokumentet (Fn-Høyre på Mac) |
-
-    ### Hjelp
-    | Tast | Handling |
-    |---|---|
-    | F1 | Vis/skjul denne hjelpeskjermen |
-    | Escape | Skjul denne hjelpeskjermen |
-  no: |
     # Markdown-visning — Hjelp
 
     ## Tastatursnarveier
