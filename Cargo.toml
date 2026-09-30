@@ -22,10 +22,12 @@ path = "src/main.rs"
 
 [dependencies]
 eframe = { version = "0.36", features = ["wgpu"] }
+ego-tree = "0.11.0"
 # NOTE: a git dependency prevents publishing to crates.io. Switch to a crates.io
 # release of egui_commonmark once it contains the required changes.
-egui_commonmark = { git = "https://github.com/durbanlegend/egui_commonmark", features = ["better_syntax_highlighting", "svg", "fetch"] }
+egui_commonmark = { git = "https://github.com/lampsitter/egui_commonmark", features = ["better_syntax_highlighting", "svg", "fetch"] }
 egui_extras = { version = "0.36", features = ["svg", "syntect"] }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 resvg = { version = "0.45", features = ["text"] }
 fontdb = { version = "0.23", features = ["fs"] }
 log = "0.4"
@@ -33,6 +35,7 @@ notify = "8"
 pulldown-cmark = "0.13"
 rfd = "0.15"
 rust-i18n = "4"
+scraper = "0.27.0"
 sys-locale = "0.3"
 
 # Keep dev builds fast enough to be usable for a GUI app.

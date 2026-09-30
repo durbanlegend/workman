@@ -1,3 +1,23 @@
+use eframe::egui;
+use egui::{
+    Color32,
+    load::{BytesPoll, ImageLoadResult, ImageLoader, ImagePoll, LoadError, SizeHint},
+};
+use egui_commonmark::{CommonMarkCache, CommonMarkScrollOptions, CommonMarkViewer, SearchOptions};
+use notify::{RecursiveMode, Watcher};
+use pulldown_cmark::{Event, Options, Parser, Tag};
+use rfd::FileDialog;
+use rust_i18n::t;
+use std::{
+    collections::HashMap,
+    env,
+    path::{Path, PathBuf},
+    sync::{
+        Arc, Mutex,
+        mpsc::{self, Receiver},
+    },
+    time::{Duration, Instant},
+};
 /// A fast lightweight multi-lingual GUI markdown viewer.
 ///
 /// Relative links are resolved relative to the parent directory of the
@@ -23,26 +43,8 @@
 //# Option: --foreground: Stay attached to the launching terminal (Unix only). Primarily for debugging.
 //# Option: --version (-V): Print version number and exit.
 //# Argument: [PATH]: Optional initial markdown file to open
-use eframe::egui;
-use egui::{
-    Color32,
-    load::{BytesPoll, ImageLoadResult, ImageLoader, ImagePoll, LoadError, SizeHint},
-};
-use egui_commonmark::{CommonMarkCache, CommonMarkScrollOptions, CommonMarkViewer, SearchOptions};
-use notify::{RecursiveMode, Watcher};
-use pulldown_cmark::{Event, Options, Parser, Tag};
-use rfd::FileDialog;
-use rust_i18n::t;
-use std::{
-    collections::HashMap,
-    env,
-    path::{Path, PathBuf},
-    sync::{
-        Arc, Mutex,
-        mpsc::{self, Receiver},
-    },
-    time::{Duration, Instant},
-};
+use workman::html_prep::preprocess_html;
+use workman::html_render::HtmlRenderer;
 
 const CMD_LINE_HELP: &str = r"A fast lightweight multi-lingual GUI markdown viewer.
 
@@ -408,6 +410,15 @@ fn absolutize_image_paths(content: &str, base_dir: &Path) -> String {
     out
 }
 
+/// Turns raw file text into what `egui_commonmark` displays: embedded HTML is
+/// rewritten (see `html_prep`), then heading `{#slug}` ids are injected (and the
+/// TOC built), then relative image paths are absolutized.
+fn prepare_markdown(raw: &str, base_dir: &Path) -> (String, Vec<TocEntry>) {
+    let prepared = preprocess_html(raw);
+    let (id_injected, toc) = extract_toc_and_inject_ids(&prepared);
+    (absolutize_image_paths(&id_injected, base_dir), toc)
+}
+
 fn path_to_file_uri(path: &Path) -> String {
     let s = path.to_string_lossy().into_owned();
     #[cfg(windows)]
@@ -746,9 +757,7 @@ fn main() -> eframe::Result<()> {
                     fence_error_content(&canonical_initial_path, fence_err)
                 }
             };
-            // Extract TOC headings and inject {#slug} attributes, then absolutize image paths.
-            let (id_injected, toc) = extract_toc_and_inject_ids(&raw_content);
-            let markdown_content = absolutize_image_paths(&id_injected, &initial_base_dir);
+            let (markdown_content, toc) = prepare_markdown(&raw_content, &initial_base_dir);
             (canonical_initial_path, raw_content, markdown_content, toc)
         },
     );
@@ -823,7 +832,7 @@ fn main() -> eframe::Result<()> {
             Ok(Box::new(MarkdownApp::new(
                 markdown_content,
                 raw_content,
-                canonical_initial_path,
+                &canonical_initial_path,
                 toc,
                 cc.egui_ctx.clone(),
             )))
@@ -890,13 +899,14 @@ struct MarkdownApp {
     /// Auto-enabled for documents ≥ [`VIEWPORT_CACHE_THRESHOLD`] bytes.
     /// Hidden from the UI for smaller documents.
     use_viewport_cache: bool,
+    html: HtmlRenderer,
 }
 
 impl MarkdownApp {
     fn new(
         content: String,
         raw_content: String,
-        path: PathBuf,
+        path: &Path,
         toc: Vec<TocEntry>,
         ctx: egui::Context,
     ) -> Self {
@@ -904,9 +914,13 @@ impl MarkdownApp {
         let mut app = Self {
             content,
             raw_content,
-            current_file_path: path.clone(),
+            current_file_path: path.to_path_buf(),
             cache: CommonMarkCache::default(),
-            history: if path.is_file() { vec![path] } else { vec![] },
+            history: if path.is_file() {
+                vec![path.to_path_buf()]
+            } else {
+                vec![]
+            },
             history_index: 0,
             font_scale: 1.0,
             toc,
@@ -922,6 +936,7 @@ impl MarkdownApp {
             last_reload: None,
             first_frame: true,
             use_viewport_cache: content_len >= &VIEWPORT_CACHE_THRESHOLD,
+            html: HtmlRenderer::new(path_to_file_uri(path)),
         };
         // eprintln!("CWD={}", std::env::current_dir().unwrap().display());
         add_code_block_themes(&mut app.cache);
@@ -1045,6 +1060,7 @@ impl MarkdownApp {
                     let (id_injected, toc) = extract_toc_and_inject_ids(&err);
                     self.content = absolutize_image_paths(&id_injected, &base_dir);
                     self.raw_content = err;
+                    self.html = HtmlRenderer::new(path_to_file_uri(&path));
                     self.current_file_path = path;
                     self.toc = toc;
                     self.cache = CommonMarkCache::default();
@@ -1068,9 +1084,10 @@ impl MarkdownApp {
                     .to_path_buf();
                 // Keep CWD in sync for future canonicalize() calls.
                 let _ = env::set_current_dir(&base_dir);
-                let (id_injected, toc) = extract_toc_and_inject_ids(&raw);
-                self.content = absolutize_image_paths(&id_injected, &base_dir);
+                let (content, toc) = prepare_markdown(&raw, &base_dir);
+                self.content = content;
                 self.raw_content = raw;
+                self.html = HtmlRenderer::new(path_to_file_uri(&path));
                 self.current_file_path = path;
                 self.toc = toc;
                 // Clear the cache so egui_commonmark doesn't carry over stale state.
@@ -1203,6 +1220,7 @@ impl MarkdownApp {
         self.toc = toc;
         // let new_show_toc = true;
         self.show_toc = true;
+        self.html = HtmlRenderer::new(path_to_file_uri(&canonical_initial_path));
         self.current_file_path = canonical_initial_path;
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(format!(
             "workman: {}",
@@ -2028,12 +2046,16 @@ impl eframe::App for MarkdownApp {
             // split-point and heading-position caches, then culls to the
             // visible viewport on all subsequent frames.  The source_id is
             // keyed to the file path so navigating to a new file resets state.
+            // RenderHtmlFn is `dyn Fn(..) + 'static`, so the closure must own a
+            // (cheap, Rc-backed) clone rather than borrow `self.html`.
+            let html = self.html.clone();
             CommonMarkViewer::new()
                 .syntax_theme_dark("Dunkel_Theme") // Must be one listed in THEME_BYTES
                 .syntax_theme_light("Slush_and_Poppies") // Must be one listed in THEME_BYTES
                 .search_match_color(match_bg)
                 .search_active_match_color(active_bg)
                 .enable_scroll_to_heading(true)
+                .render_html_fn(Some(&move |ui, chunk| html.render(ui, chunk)))
                 .show_scrollable(
                     id,
                     ui,
