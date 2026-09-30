@@ -28,6 +28,24 @@ Relative links are resolved relative to the parent directory of the current mark
 
 ## Installation
 
+### Prebuilt binaries
+
+macOS and Linux:
+
+```sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/durbanlegend/workman/releases/latest/download/workman-installer.sh | sh
+```
+
+Windows (PowerShell):
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/durbanlegend/workman/releases/latest/download/workman-installer.ps1 | iex"
+```
+
+Or download an archive for your platform from the [releases page](https://github.com/durbanlegend/workman/releases).
+
+### From source
+
 ```sh
 cargo install --git https://github.com/durbanlegend/workman
 ```
