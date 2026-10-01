@@ -50,7 +50,17 @@ fn opts() -> Options {
 ///   the body keep syntax highlighting, but it can't be collapsed.
 /// * `false`: rendered by `html_render` as a real collapsible section, but
 ///   text drawn there is invisible to the viewer's search.
-pub const EXPAND_DETAILS: bool = false;
+pub const EXPAND_DETAILS: bool = true;
+
+/// Whether `egui_commonmark` renders inline style tags itself (its `inline_html`
+/// feature, enabled here by `native-inline-html`).
+///
+/// * `true`: `<u>`, `<mark>`, `<kbd>`, `<sub>`, `<sup>`, `<br>`, `<b>`, ... are left
+///   for the viewer, which gives real underline/highlight/sub/superscript.
+///   `<a>`, `<img>` and the transparent tags are still rewritten here.
+/// * `false`: everything is rewritten to the nearest Markdown, so `<u>` becomes
+///   italics and `<mark>` bold.
+pub const NATIVE_INLINE_HTML: bool = cfg!(feature = "native-inline-html");
 
 /// Entry point. Cheap no-op for documents without any `<`.
 #[must_use]
@@ -61,10 +71,45 @@ pub fn preprocess_html(md: &str) -> String {
 /// [`preprocess_html`] with an explicit choice for [`EXPAND_DETAILS`].
 #[must_use]
 pub fn preprocess_html_with(md: &str, expand_details: bool) -> String {
+    preprocess_html_opts(md, expand_details, NATIVE_INLINE_HTML)
+}
+
+/// [`preprocess_html`] with an explicit choice for both options.
+#[must_use]
+pub fn preprocess_html_opts(md: &str, expand_details: bool, native_inline: bool) -> String {
     if !md.contains('<') {
         return md.to_owned();
     }
-    rewrite_inline_html(&lower_blocks(&merge_split_blocks(md, expand_details)))
+    rewrite_inline_html(
+        &lower_blocks(&merge_split_blocks(md, expand_details)),
+        native_inline,
+    )
+}
+
+/// Tags `egui_commonmark`'s `inline_html` feature renders itself.
+fn handled_natively(name: &str) -> bool {
+    matches!(
+        name,
+        "b" | "strong"
+            | "i"
+            | "em"
+            | "cite"
+            | "dfn"
+            | "var"
+            | "u"
+            | "ins"
+            | "s"
+            | "del"
+            | "strike"
+            | "mark"
+            | "code"
+            | "kbd"
+            | "samp"
+            | "tt"
+            | "sub"
+            | "sup"
+            | "br"
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -583,6 +628,7 @@ fn rewrite_tag(
     md: &str,
     links: &mut Vec<Option<String>>,
     no_break: bool,
+    native_inline: bool,
 ) -> Option<Rewrite> {
     let (Event::InlineHtml(raw), range) = &events[i] else {
         return None;
@@ -598,6 +644,9 @@ fn rewrite_tag(
         return Some(plain(String::new()));
     }
     let (name, closing) = parse_tag(raw)?;
+    if native_inline && handled_natively(&name) {
+        return None;
+    }
     let marker = |m: &str| Rewrite {
         text: m.to_owned(),
         end: range.end,
@@ -687,7 +736,7 @@ fn rewrite_tag(
     })
 }
 
-fn rewrite_inline_html(md: &str) -> String {
+fn rewrite_inline_html(md: &str, native_inline: bool) -> String {
     let events: Vec<(Event, Range<usize>)> =
         Parser::new_ext(md, opts()).into_offset_iter().collect();
     let mut out = String::with_capacity(md.len());
@@ -703,7 +752,9 @@ fn rewrite_inline_html(md: &str) -> String {
                 no_break = no_break.saturating_sub(1);
             }
             Event::InlineHtml(_) => {
-                if let Some(rw) = rewrite_tag(&events, i, md, &mut links, no_break > 0) {
+                if let Some(rw) =
+                    rewrite_tag(&events, i, md, &mut links, no_break > 0, native_inline)
+                {
                     out.push_str(&md[pos..events[i].1.start]);
                     match rw.kind {
                         Kind::Plain => {
@@ -746,7 +797,7 @@ mod tests {
         let md = "* **Underline:** <u>This text.</u>\n\
                   * H<sub>2</sub>O and a<sup>2</sup> + b<sup>2</sup>\n\
                   * <mark>hi</mark> <kbd>Ctrl</kbd> <b>bold </b>x <span>s</span>\n";
-        let out = preprocess_html(md);
+        let out = preprocess_html_opts(md, true, false);
         assert!(out.contains("*This text.*"), "{out}");
         assert!(out.contains("H₂O and a² + b²"), "{out}");
         assert!(out.contains("**hi** `Ctrl` **bold** x s"), "{out}");
@@ -754,11 +805,35 @@ mod tests {
     }
 
     #[test]
+    fn native_mode_leaves_style_tags_to_the_viewer() {
+        let md = concat!(
+            "<u>u</u> H<sub>2</sub>O <mark>m</mark> a<br>b <kbd>K</kbd> ",
+            "<a href=\"https://x.y\">link</a> <span>s</span>\n"
+        );
+        let out = preprocess_html_opts(md, true, true);
+        for kept in [
+            "<u>u</u>",
+            "<sub>2</sub>",
+            "<mark>m</mark>",
+            "<br>",
+            "<kbd>K</kbd>",
+        ] {
+            assert!(out.contains(kept), "{kept} should be left alone: {out}");
+        }
+        // Not handled by the viewer, so still rewritten.
+        assert!(out.contains("[link](https://x.y)"), "{out}");
+        assert!(!out.contains("<span>"), "{out}");
+        // And the default (non-native) mode rewrites the lot.
+        let out = preprocess_html_opts(md, true, false);
+        assert!(!out.contains('<'), "{out}");
+    }
+
+    #[test]
     fn br_becomes_hard_break() {
         let md = "Registry  \nWay  \n<br>\nCape Town  \n7405\n";
-        let out = preprocess_html(md);
+        let out = preprocess_html_opts(md, true, false);
         assert_eq!(out, "Registry  \nWay  \n\\\nCape Town  \n7405\n");
-        assert_eq!(preprocess_html("a<br>b\n"), "a\\\nb\n");
+        assert_eq!(preprocess_html_opts("a<br>b\n", true, false), "a\\\nb\n");
     }
 
     #[test]

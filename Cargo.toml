@@ -38,6 +38,21 @@ rust-i18n = "4"
 scraper = "0.27.0"
 sys-locale = "0.3"
 
+[features]
+# EXPERIMENT (branch `html-opt-in`): let egui_commonmark render inline html tags
+# (<u>, <mark>, <sub>, <br>, ...) itself instead of rewriting them to Markdown in
+# `html_prep`. Needs the local fork patched in below. Try it with:
+#   cargo run --features native-inline-html -- README.md
+native-inline-html = ["egui_commonmark/inline_html"]
+
+# EXPERIMENT (branch `html-opt-in`): build against the local fork, which has the
+# `inline_html` feature. Cargo checks feature names even when they are not enabled,
+# so this must stay while `native-inline-html` exists.
+# DO NOT MERGE OR PUBLISH with this section: it needs ../egui_commonmark.
+[patch."https://github.com/lampsitter/egui_commonmark"]
+egui_commonmark = { path = "../egui_commonmark/egui_commonmark" }
+egui_commonmark_backend = { path = "../egui_commonmark/egui_commonmark_backend" }
+
 # Keep dev builds fast enough to be usable for a GUI app.
 [profile.dev]
 opt-level = 3
