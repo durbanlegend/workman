@@ -600,7 +600,7 @@ fn centered_row(ui: &mut Ui, id: Id, add_contents: impl FnOnce(&mut Ui)) {
 // ---------------------------------------------------------------------------
 
 /// HTML whitespace collapsing (keeps a single leading/trailing space if present).
-fn collapse(s: &str) -> String {
+pub(crate) fn collapse(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut prev_space = false;
     for c in s.chars() {
