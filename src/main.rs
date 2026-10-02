@@ -1,3 +1,4 @@
+use crate::base16::Base16;
 use eframe::egui;
 use egui::Color32;
 use egui_commonmark::{CommonMarkCache, CommonMarkScrollOptions, CommonMarkViewer, SearchOptions};
@@ -84,7 +85,7 @@ macro_rules! theme_bytes {
     };
 }
 
-const THEME_BYTES: &[(&str, &[u8])] = theme_bytes!("Dunkel_Theme", "Slush_and_Poppies",);
+const THEME_BYTES: &[(&str, &[u8])] = theme_bytes!("Dunkel_Theme", "Gruvbox_Light",);
 
 /// Applies contrast colours to both egui themes; font sizes are always left at
 /// egui defaults so toggling never causes a scroll-position jump.
@@ -794,6 +795,13 @@ fn main() -> eframe::Result<()> {
         .unwrap()
         .push(monospace_font.to_owned());
 
+    // let path = "assets/themes/atelier_seaside_light.yaml";
+    let path = "assets/themes/gruvbox-light-hard.yaml";
+    let theme = Base16::from_file(&path).unwrap_or_else(|e| {
+        eprintln!("failed to load {path}: {e}");
+        std::process::exit(1);
+    });
+
     eframe::run_native(
         "Markdown Viewer",
         options,
@@ -807,6 +815,7 @@ fn main() -> eframe::Result<()> {
             cc.egui_ctx
                 .add_image_loader(Arc::new(fast_svg_loader::FastSvgLoader::new()));
             apply_style(&cc.egui_ctx, true);
+            theme.apply(&cc.egui_ctx);
 
             Ok(Box::new(MarkdownApp::new(
                 markdown_content,
@@ -2035,7 +2044,7 @@ impl eframe::App for MarkdownApp {
             let html = self.html.clone();
             CommonMarkViewer::new()
                 .syntax_theme_dark("Dunkel_Theme") // Must be one listed in THEME_BYTES
-                .syntax_theme_light("Slush_and_Poppies") // Must be one listed in THEME_BYTES
+                .syntax_theme_light("Gruvbox_Light") // Must be one listed in THEME_BYTES
                 .search_match_color(match_bg)
                 .search_active_match_color(active_bg)
                 .enable_scroll_to_heading(true)
@@ -2207,4 +2216,5 @@ fn customise_scrollbar(ui: &mut egui::Ui) {
     scroll.active_handle_opacity = 0.80;
 }
 
+mod base16;
 mod fast_svg_loader;
