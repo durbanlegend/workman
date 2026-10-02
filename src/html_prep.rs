@@ -18,7 +18,7 @@
 //!    ```code```
 //!    </details>
 //!    ```
-//!    CommonMark ends an HTML block at a blank line, so the opening tags, the
+//!    `CommonMark` ends an HTML block at a blank line, so the opening tags, the
 //!    Markdown in between and the closing tags are three unrelated top-level
 //!    blocks. We convert the Markdown in between to HTML and merge everything
 //!    into a single HTML block, which `html_render` can then nest properly.
@@ -32,8 +32,7 @@ use crate::html_render::{collapse, tag_depth};
 use ego_tree::NodeRef;
 use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd, html::push_html};
 use scraper::{ElementRef, Html, Node};
-use std::collections::HashSet;
-use std::ops::Range;
+use std::{collections::HashSet, fmt::Write, ops::Range};
 
 fn opts() -> Options {
     Options::ENABLE_TABLES
@@ -177,7 +176,7 @@ fn merge_split_blocks(md: &str, expand_details: bool) -> String {
                             String::new()
                         };
                         out.push_str(&md[pos..b.range.start]);
-                        out.push_str(&format!("**\u{25be} {}**\n\n", escape_md(&title)));
+                        let _ = write!(out, "**\u{25be} {}**\n\n", escape_md(&title));
                         out.push_str(&body);
                         out.push_str("\n\n");
                         pos = blocks[j].range.end;
@@ -301,7 +300,7 @@ fn collect_rows<'a>(n: ElementRef<'a>, out: &mut Vec<ElementRef<'a>>) {
     }
 }
 
-fn cells<'a>(row: ElementRef<'a>) -> impl Iterator<Item = ElementRef<'a>> {
+fn cells(row: ElementRef<'_>) -> impl Iterator<Item = ElementRef<'_>> {
     row.children()
         .filter_map(ElementRef::wrap)
         .filter(|e| matches!(e.value().name(), "td" | "th"))
@@ -370,7 +369,7 @@ fn table_to_md(table: ElementRef) -> Option<String> {
     {
         let cap = node_md(*cap);
         if !cap.trim().is_empty() {
-            out.push_str(&format!("**{}**\n\n", cap.trim()));
+            let _ = write!(out, "**{}**\n\n", cap.trim());
         }
     }
     let body = if header_first {
@@ -504,7 +503,7 @@ fn dest(url: &str) -> String {
     }
 }
 
-fn sup_char(c: char) -> Option<char> {
+const fn sup_char(c: char) -> Option<char> {
     Some(match c {
         '0' => '⁰',
         '1' => '¹',
@@ -528,7 +527,7 @@ fn sup_char(c: char) -> Option<char> {
     })
 }
 
-fn sub_char(c: char) -> Option<char> {
+const fn sub_char(c: char) -> Option<char> {
     Some(match c {
         '0' => '₀',
         '1' => '₁',
@@ -610,7 +609,7 @@ fn rewrite_tag(
         ("i" | "em" | "cite" | "var" | "dfn" | "u" | "ins", _) => marker("*"),
         ("s" | "del" | "strike", _) => marker("~~"),
         ("code" | "kbd" | "samp" | "tt", _) => plain("`".to_owned()),
-        ("wbr", _) => plain(String::new()),
+        ("sub" | "sup", true) | ("wbr", _) => plain(String::new()),
         ("br", _) => {
             // Skip trailing spaces so `<br>  \n` doesn't leave a literal `\`.
             let after = md[range.end..].trim_start_matches([' ', '\t']);
@@ -640,16 +639,15 @@ fn rewrite_tag(
                 kind: Kind::Plain,
             }
         }
-        ("a", false) => match attr(raw, "href") {
-            Some(href) => {
+        ("a", false) => {
+            if let Some(href) = attr(raw, "href") {
                 links.push(Some(href));
                 plain("[".to_owned())
-            }
-            None => {
+            } else {
                 links.push(None);
                 plain(String::new())
             }
-        },
+        }
         ("a", true) => match links.pop() {
             Some(Some(href)) => plain(format!("]({})", dest(&href))),
             _ => plain(String::new()),
@@ -681,7 +679,6 @@ fn rewrite_tag(
                 _ => plain(String::new()),
             }
         }
-        ("sub" | "sup", true) => plain(String::new()),
         (n, _) if TRANSPARENT.contains(&n) => plain(String::new()),
         _ => return None,
     })

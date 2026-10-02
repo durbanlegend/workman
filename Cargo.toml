@@ -37,6 +37,7 @@ rfd = "0.15"
 rust-i18n = "4"
 scraper = "0.27.0"
 sys-locale = "0.3"
+thag_common = "1"
 
 # Keep dev builds fast enough to be usable for a GUI app.
 [profile.dev]

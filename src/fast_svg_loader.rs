@@ -27,28 +27,28 @@ use std::{
 // set of known directories, reading font files directly without the macOS
 // CoreText/AssetsV2 scan, which is fast (<1 s).
 
-pub(crate) struct FastSvgLoader {
-    pub(crate) state: Mutex<FastSvgState>,
+pub struct FastSvgLoader {
+    pub state: Mutex<FastSvgState>,
 }
 
-pub(crate) struct FastSvgState {
-    pub(crate) pass_index: u64,
-    pub(crate) cache: HashMap<String, HashMap<SizeHint, FastSvgEntry>>,
-    pub(crate) options: resvg::usvg::Options<'static>,
+pub struct FastSvgState {
+    pub pass_index: u64,
+    pub cache: HashMap<String, HashMap<SizeHint, FastSvgEntry>>,
+    pub options: resvg::usvg::Options<'static>,
 }
 
-pub(crate) struct FastSvgEntry {
-    pub(crate) last_used: u64,
-    pub(crate) result: Result<Arc<egui::ColorImage>, String>,
+pub struct FastSvgEntry {
+    pub last_used: u64,
+    pub result: Result<Arc<egui::ColorImage>, String>,
 }
 
 impl FastSvgLoader {
     /// Must match `egui::generate_loader_id!(SvgLoader)` as evaluated inside
     /// the `egui_extras::loaders::svg_loader` module:
     /// `concat!(module_path!(), "::", "SvgLoader")`
-    pub(crate) const ID: &str = "egui_extras::loaders::svg_loader::SvgLoader";
+    pub const ID: &str = "egui_extras::loaders::svg_loader::SvgLoader";
 
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         let mut options = resvg::usvg::Options::default();
 
         // Populate fontdb from known directories instead of calling

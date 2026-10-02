@@ -15,6 +15,7 @@ use std::{
     },
     time::{Duration, Instant},
 };
+use thag_common::{auto_help, help_system::check_help_and_exit};
 /// A fast lightweight multi-lingual GUI markdown viewer.
 ///
 /// Relative links are resolved relative to the parent directory of the
@@ -37,41 +38,12 @@ use std::{
 //# Purpose: A GUI markdown viewer with navigation, zoom, and file-open support.
 //# Categories: crates, gui, tools
 //# Usage: workman [OPTIONS] [PATH]
-//# Option: --foreground: Stay attached to the launching terminal (Unix only). Primarily for debugging.
+//# Option: --foreground / -f: Stay attached to the launching terminal (Unix only). Primarily for debugging.
+//# Option: --search-collapsible / -s: Expand collapsible widgets to make them searchable.
 //# Option: --version (-V): Print version number and exit.
 //# Argument: [PATH]: Optional initial markdown file to open
-use workman::html_prep::preprocess_html;
+use workman::html_prep::preprocess_html_with;
 use workman::html_render::HtmlRenderer;
-
-const CMD_LINE_HELP: &str = r"A fast lightweight multi-lingual GUI markdown viewer.
-
-Relative links are resolved relative to the parent directory of the
-current markdown file, so navigation between linked documents works correctly.
-
-Features:
-- Support for 28 languages, according to your LOCALE or LANG system/environment variable. E.g. LOCALE=fr.
-- Multi-file navigation: files can be selected or dragged and dropped singly or in batches as and when needed.
-- Large document support.
-- Light/dark/system theme switching.
-- Zoom and font scaling with reset.
-- Optional table of contents sidebar.
-- Full-document search with options for case (in)sensitive, whole word and regular expression searches.
-- Search across mixed text and code spans and link anchors.
-- Automatic live file watching and refresh
-
-On Unix systems, launching from a terminal automatically detaches the process so the terminal
-is returned immediately (use --foreground to suppress this).
-
-USAGE:
-    workman [OPTIONS] [PATH]
-
-OPTIONS:
-    -h, --help       Print help
-    --foreground     Stay attached to the launching terminal (Unix only). Primarily for debugging.
-    --version (-V)   Print version number and exit.
-
-ARGUMENTS:
-    [PATH]           Optional initial markdown file to open";
 
 const HIST_BACK_ICON: &str = "\u{25c0}";
 const HIST_FWD_ICON: &str = "\u{25b6}";
@@ -410,8 +382,12 @@ fn absolutize_image_paths(content: &str, base_dir: &Path) -> String {
 /// Turns raw file text into what `egui_commonmark` displays: embedded HTML is
 /// rewritten (see `html_prep`), then heading `{#slug}` ids are injected (and the
 /// TOC built), then relative image paths are absolutized.
-fn prepare_markdown(raw: &str, base_dir: &Path) -> (String, Vec<TocEntry>) {
-    let prepared = preprocess_html(raw);
+fn prepare_markdown(
+    raw: &str,
+    base_dir: &Path,
+    search_collapsible: bool,
+) -> (String, Vec<TocEntry>) {
+    let prepared = preprocess_html_with(raw, search_collapsible);
     let (id_injected, toc) = extract_toc_and_inject_ids(&prepared);
     (absolutize_image_paths(&id_injected, base_dir), toc)
 }
@@ -576,7 +552,9 @@ fn detach_if_tty() {
         return;
     }
     let args_os: Vec<_> = env::args_os().collect();
-    let already_detached = args_os.iter().any(|a| a == "--foreground");
+    let already_detached = args_os
+        .iter()
+        .any(|a| a == "--foreground" || a == "-f" || a == "-fs" || a == "-sf");
     if already_detached {
         return;
     }
@@ -639,18 +617,17 @@ fn main() -> eframe::Result<()> {
     // Hard size limit — refuse immediately so the GUI doesn't freeze.
     const MAX_BYTES: usize = 50_000_000;
 
+    // Check for help first - automatically extracts from source comments
+    let help = auto_help!();
+    check_help_and_exit(&help);
+
     // Set the UI locale from the operating system before any translatable string is used.
     let locale = detect_locale();
     rust_i18n::set_locale(&locale);
     // dbg!(&locale);
 
     // Strip internal markers before processing positional arguments.
-    let args: Vec<String> = env::args().filter(|a| a != "--foreground").collect();
-
-    if args.contains(&"--help".to_string()) || args.contains(&"-h".to_string()) {
-        eprintln!("{CMD_LINE_HELP}");
-        return Ok(());
-    }
+    let args: Vec<String> = env::args().filter(|a| !a.starts_with('-')).collect();
 
     if args.contains(&"--version".to_string()) || args.contains(&"-V".to_string()) {
         eprintln!(
@@ -686,6 +663,9 @@ fn main() -> eframe::Result<()> {
     } else {
         None
     };
+
+    let search_collapsible =
+        env::args().any(|x| x == "-s" || x == "-sf" || x == "-fs" || x == "--search-collapsible");
 
     #[cfg(unix)]
     detach_if_tty();
@@ -754,7 +734,8 @@ fn main() -> eframe::Result<()> {
                     fence_error_content(&canonical_initial_path, fence_err)
                 }
             };
-            let (markdown_content, toc) = prepare_markdown(&raw_content, &initial_base_dir);
+            let (markdown_content, toc) =
+                prepare_markdown(&raw_content, &initial_base_dir, search_collapsible);
             (canonical_initial_path, raw_content, markdown_content, toc)
         },
     );
@@ -833,6 +814,7 @@ fn main() -> eframe::Result<()> {
                 &canonical_initial_path,
                 toc,
                 cc.egui_ctx.clone(),
+                search_collapsible,
             )))
         }),
     )
@@ -898,6 +880,8 @@ struct MarkdownApp {
     /// Hidden from the UI for smaller documents.
     use_viewport_cache: bool,
     html: HtmlRenderer,
+    /// Whether to expand disclosure widgets to expose them to the `egui_commonmark` search facility.
+    search_collapsible: bool,
 }
 
 impl MarkdownApp {
@@ -907,6 +891,7 @@ impl MarkdownApp {
         path: &Path,
         toc: Vec<TocEntry>,
         ctx: egui::Context,
+        search_collapsible: bool,
     ) -> Self {
         let content_len = &content.len();
         let mut app = Self {
@@ -935,6 +920,7 @@ impl MarkdownApp {
             first_frame: true,
             use_viewport_cache: content_len >= &VIEWPORT_CACHE_THRESHOLD,
             html: HtmlRenderer::new(path_to_file_uri(path)),
+            search_collapsible,
         };
         // eprintln!("CWD={}", std::env::current_dir().unwrap().display());
         add_code_block_themes(&mut app.cache);
@@ -1082,7 +1068,7 @@ impl MarkdownApp {
                     .to_path_buf();
                 // Keep CWD in sync for future canonicalize() calls.
                 let _ = env::set_current_dir(&base_dir);
-                let (content, toc) = prepare_markdown(&raw, &base_dir);
+                let (content, toc) = prepare_markdown(&raw, &base_dir, self.search_collapsible);
                 self.content = content;
                 self.raw_content = raw;
                 self.html = HtmlRenderer::new(path_to_file_uri(&path));
@@ -2220,4 +2206,5 @@ fn customise_scrollbar(ui: &mut egui::Ui) {
     scroll.interact_handle_opacity = 0.55;
     scroll.active_handle_opacity = 0.80;
 }
+
 mod fast_svg_loader;
