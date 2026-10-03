@@ -103,7 +103,7 @@ macro_rules! theme_bytes {
     };
 }
 
-// const SYNTAX_STR: &[(&str, &str)] = syntax_str!("TOML_Syntax_Highlighting");
+const SYNTAX_STR: &[(&str, &str)] = syntax_str!("PowerShell", "TOML_Syntax_Highlighting");
 const THEME_BYTES: &[(&str, &[u8])] = theme_bytes!("Dunkel_Theme", "Gruvbox_Light", "Spectacular");
 const CARGO_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
@@ -1337,10 +1337,12 @@ impl MarkdownApp {
 }
 
 fn add_code_block_themes(cache: &mut CommonMarkCache) {
-    // cache.add_syntax_from_folder("assets/sublime_syntax");
-    cache
-        .add_syntax_from_str(syntax_str!("TOML_Syntax_Highlighting")[0].1, Some("toml"))
-        .ok();
+    for (name, syntax_yaml) in SYNTAX_STR {
+        eprintln!("name={}", name.to_lowercase());
+        if let Err(e) = cache.add_syntax_from_str(syntax_yaml, Some(&name.to_lowercase())) {
+            eprintln!("failed to load {name}: {e}");
+        }
+    }
     for (theme, bytes) in THEME_BYTES {
         cache.add_syntax_theme_from_bytes(*theme, bytes).unwrap();
     }
