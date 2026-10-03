@@ -67,6 +67,24 @@ const VIEWPORT_CACHE_THRESHOLD: usize = 200_000; // 200 KB
 
 rust_i18n::i18n!("locales", fallback = "en");
 
+macro_rules! syntax_str {
+    ($($syntax:literal),+ $(,)?) => {
+        &[
+            $(
+                (
+                    $syntax,
+                    include_str!(concat!(
+                        env!("CARGO_MANIFEST_DIR"),
+                        "/assets/sublime_syntax/",
+                        $syntax,
+                        ".sublime-syntax"
+                    ))
+                ),
+            )+
+        ]
+    };
+}
+
 macro_rules! theme_bytes {
     ($($theme:literal),+ $(,)?) => {
         &[
@@ -85,7 +103,9 @@ macro_rules! theme_bytes {
     };
 }
 
-const THEME_BYTES: &[(&str, &[u8])] = theme_bytes!("Dunkel_Theme", "Gruvbox_Light",);
+// const SYNTAX_STR: &[(&str, &str)] = syntax_str!("TOML_Syntax_Highlighting");
+const THEME_BYTES: &[(&str, &[u8])] = theme_bytes!("Dunkel_Theme", "Gruvbox_Light", "Spectacular");
+const CARGO_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
 /// Applies contrast colours to both egui themes; font sizes are always left at
 /// egui defaults so toggling never causes a scroll-position jump.
@@ -796,7 +816,9 @@ fn main() -> eframe::Result<()> {
         .push(monospace_font.to_owned());
 
     // let path = "assets/themes/atelier_seaside_light.yaml";
-    let path = "assets/themes/gruvbox-light-hard.yaml";
+    // eprintln!("CARGO_MANIFEST_DIR={}", env!("CARGO_MANIFEST_DIR"));
+    let path = "assets/themes/gruvbox-light-soft.yaml";
+    let path = format!("{CARGO_MANIFEST_DIR}/{path}");
     let theme = Base16::from_file(&path).unwrap_or_else(|e| {
         eprintln!("failed to load {path}: {e}");
         std::process::exit(1);
@@ -1315,6 +1337,10 @@ impl MarkdownApp {
 }
 
 fn add_code_block_themes(cache: &mut CommonMarkCache) {
+    // cache.add_syntax_from_folder("assets/sublime_syntax");
+    cache
+        .add_syntax_from_str(syntax_str!("TOML_Syntax_Highlighting")[0].1, Some("toml"))
+        .ok();
     for (theme, bytes) in THEME_BYTES {
         cache.add_syntax_theme_from_bytes(*theme, bytes).unwrap();
     }
@@ -2044,7 +2070,7 @@ impl eframe::App for MarkdownApp {
             let html = self.html.clone();
             CommonMarkViewer::new()
                 .syntax_theme_dark("Dunkel_Theme") // Must be one listed in THEME_BYTES
-                .syntax_theme_light("Gruvbox_Light") // Must be one listed in THEME_BYTES
+                .syntax_theme_light("Spectacular") // Must be one listed in THEME_BYTES
                 .search_match_color(match_bg)
                 .search_active_match_color(active_bg)
                 .enable_scroll_to_heading(true)
