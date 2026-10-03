@@ -6,7 +6,7 @@
 
 ### Raw
 
-```
+```html
 <img src="https://raw.githubusercontent.com/lampsitter/egui_commonmark/master/assets/example-v4.png" alt="showcase" width=280/>
 ```
 
@@ -25,7 +25,7 @@ otherwise collapsible and not searchable.
 
 The inner code block has been indented here to prevented nested display issues. It would not be indented in practice.
 
-```
+```html
 <details>
     <summary>Click <b>here</b> to view the error logs</summary>
 
@@ -51,7 +51,7 @@ Error: Connection timeout at server.js:42
 
 ### Raw
 
-```
+```md
 * **Underline:** <u>This text will be underlined.</u>
 * **Subscript:** H<sub>2</sub>O (Water)
 * **Superscript:** The theorem is a<sup>2</sup> + b<sup>2</sup> = c<sup>2</sup>
@@ -71,7 +71,7 @@ Error: Connection timeout at server.js:42
 
 ### Raw
 
-```
+```md
 To save your current progress, press <kbd>Ctrl</kbd> + <kbd>S</kbd> on your keyboard.
 ```
 
@@ -87,7 +87,7 @@ The address lines each end in two spaces, causing a hard break
 
 ### Raw
 
-```
+```md
 Company Name Registry  
 123 Innovation Way  
 <br>
@@ -109,7 +109,7 @@ Cape Town, South Africa
 
 ### Raw
 
-```
+```html
 <table>
   <tr>
     <th>Item</th>
@@ -153,7 +153,7 @@ Cape Town, South Africa
 
 ### Raw
 
-```
+```html
 Check out our product demo video below:
 
 <iframe width="560" height="315" src="https://youtube.com" frameborder="0" allowfullscreen></iframe>
@@ -164,5 +164,25 @@ Check out our product demo video below:
 Check out our product demo video below:
 
 <iframe width="560" height="315" src="https://youtube.com" frameborder="0" allowfullscreen></iframe>
+
+---
+
+## Un-annotated code blocks
+
+### Raw
+
+This has been indented just so that it will display in raw form.
+
+```md
+    ```
+    To save your current progress, press <kbd>Ctrl</kbd> + <kbd>S</kbd> on your keyboard.
+    ```
+```
+
+### Rendered
+
+```
+To save your current progress, press <kbd>Ctrl</kbd> + <kbd>S</kbd> on your keyboard.
+```
 
 ---

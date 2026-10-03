@@ -39,7 +39,6 @@ scraper = "0.27.0"
 serde_yaml = "0.9"
 sys-locale = "0.3"
 thag_common = "1"
-two-face = { version = "0.5.2", features = ["syntect-fancy"] }
 
 # Keep dev builds fast enough to be usable for a GUI app.
 [profile.dev]
