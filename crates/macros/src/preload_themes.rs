@@ -13,6 +13,7 @@ pub fn preload_themes_impl(_input: TokenStream) -> TokenStream {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
     // eprintln!("The project manifest directory is: {manifest_dir}");
     let themes_dir = manifest_dir + "/assets/themes";
+    // let themes_dir = "/Users/donf/projects/schemes-spec-0.11/base16/";
 
     let mut theme_indices = Vec::new();
     // let mut themes: HashMap<[u8; 3], Vec<String>> = HashMap::new();

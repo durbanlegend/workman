@@ -12,10 +12,14 @@ pub struct Base16 {
 }
 
 impl Base16 {
+    /// # Errors
+    /// Will bubble up any errors encountered reading the file from disk.
     pub fn from_file(path: impl AsRef<Path>) -> Result<Self, Box<dyn Error>> {
         Self::from_yaml(&fs::read_to_string(path)?)
     }
 
+    /// # Errors
+    /// Will bubble up any errors encountered parsing the `YAML` file.
     pub fn from_yaml(src: &str) -> Result<Self, Box<dyn Error>> {
         let root: serde_yaml::Value = serde_yaml::from_str(src)?;
         let palette = root.get("palette").unwrap_or(&root);
@@ -67,6 +71,7 @@ impl Base16 {
         ctx.set_theme(theme); // pins ThemePreference to Dark/Light (ignores OS setting)
     }
 
+    #[must_use]
     pub fn visuals(&self) -> Visuals {
         let c = &self.c;
         let (bg, bg_alt, bg_sel, border, muted) = (c[0x0], c[0x1], c[0x2], c[0x3], c[0x4]);
