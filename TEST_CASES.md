@@ -167,22 +167,23 @@ Check out our product demo video below:
 
 ---
 
-## Un-annotated code blocks
+## Legibility of un-annotated code blocks
 
 ### Raw
 
-This has been indented just so that it will display in raw form.
+Does this code block render with enough contrast to be clearly legible?
 
-```md
     ```
-    To save your current progress, press <kbd>Ctrl</kbd> + <kbd>S</kbd> on your keyboard.
+    [package]
+    name = "workman"
+
     ```
-```
 
 ### Rendered
 
 ```
-To save your current progress, press <kbd>Ctrl</kbd> + <kbd>S</kbd> on your keyboard.
+[package]
+name = "workman"
 ```
 
 ---

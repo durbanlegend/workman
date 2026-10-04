@@ -3,8 +3,9 @@ use egui::{Color32, Stroke, Visuals};
 use std::{error::Error, fs, path::Path};
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct Base16 {
-    pub name: String,
+    pub name: &'static str,
     pub is_dark: bool,
     /// base00..=base0F, indexed 0..=15
     pub c: [Color32; 16],
@@ -43,7 +44,11 @@ impl Base16 {
             _ => luminance(c[0]) < 0.5_f32,
         };
 
-        Ok(Self { name, is_dark, c })
+        Ok(Self {
+            name: Box::leak(name.into_boxed_str()),
+            is_dark,
+            c,
+        })
     }
 
     /// Apply this scheme to an egui context.

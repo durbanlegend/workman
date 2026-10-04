@@ -1,0 +1,11 @@
+[package]
+name = "base16"
+version.workspace = true   # Inherits version 0.1.0 from the root
+edition.workspace = true   # Inherits the Rust 2024 Edition
+authors.workspace = true   # Inherits your author info
+
+[dependencies]
+# If base16 needs external packages (e.g., serde), add them here:
+# serde = { version = "1.0", features = ["derive"] }
+eframe = { workspace = true }
+serde_yaml = { workspace = true }

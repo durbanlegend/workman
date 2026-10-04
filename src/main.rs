@@ -1,7 +1,8 @@
-use crate::base16::Base16;
+use base16::Base16;
 use eframe::egui;
 use egui::Color32;
 use egui_commonmark::{CommonMarkCache, CommonMarkScrollOptions, CommonMarkViewer, SearchOptions};
+use macros::preload_themes;
 use notify::{RecursiveMode, Watcher};
 use pulldown_cmark::{Event, Options, Parser, Tag};
 use rfd::FileDialog;
@@ -39,8 +40,8 @@ use thag_common::{auto_help, help_system::check_help_and_exit};
 //# Purpose: A GUI markdown viewer with navigation, zoom, and file-open support.
 //# Categories: crates, gui, tools
 //# Usage: workman [OPTIONS] [PATH]
-//# Option: --foreground / -f: Stay attached to the launching terminal (Unix only). Primarily for debugging.
-//# Option: --search-collapsible / -s: Expand collapsible widgets to make them searchable.
+//# Option: --foreground (-f): Stay attached to the launching terminal (Unix only). Primarily for debugging.
+//# Option: --search-collapsible (-s): Expand collapsible widgets to make them searchable.
 //# Option: --version (-V): Print version number and exit.
 //# Argument: [PATH]: Optional initial markdown file to open
 use workman::html_prep::preprocess_html_with;
@@ -103,9 +104,114 @@ macro_rules! theme_bytes {
     };
 }
 
+// Preload Base16 themes from the `assets/themes` directory into a static HashMap `THEME_MAP`.
+preload_themes! {}
+// static THEME_MAP: phf::Map<&'static str, Base16> = phf::phf_map! {
+//     "catppuccin-mocha" => Base16
+//     {
+//         name : "Catppuccin Mocha", is_dark : true, c :
+//         [egui :: Color32 :: from_rgba_unmultiplied_const(30u8, 30u8, 46u8, 255u8),
+//         egui :: Color32 :: from_rgba_unmultiplied_const(24u8, 24u8, 37u8, 255u8),
+//         egui :: Color32 :: from_rgba_unmultiplied_const(49u8, 50u8, 68u8, 255u8),
+//         egui :: Color32 :: from_rgba_unmultiplied_const(69u8, 71u8, 90u8, 255u8),
+//         egui :: Color32 :: from_rgba_unmultiplied_const(88u8, 91u8, 112u8, 255u8),
+//         egui :: Color32 :: from_rgba_unmultiplied_const(205u8, 214u8, 244u8, 255u8),
+//         egui :: Color32 :: from_rgba_unmultiplied_const(245u8, 224u8, 220u8, 255u8),
+//         egui :: Color32 :: from_rgba_unmultiplied_const(180u8, 190u8, 254u8, 255u8),
+//         egui :: Color32 :: from_rgba_unmultiplied_const(243u8, 139u8, 168u8, 255u8),
+//         egui :: Color32 :: from_rgba_unmultiplied_const(250u8, 179u8, 135u8, 255u8),
+//         egui :: Color32 :: from_rgba_unmultiplied_const(249u8, 226u8, 175u8, 255u8),
+//         egui :: Color32 :: from_rgba_unmultiplied_const(166u8, 227u8, 161u8, 255u8),
+//         egui :: Color32 :: from_rgba_unmultiplied_const(148u8, 226u8, 213u8, 255u8),
+//         egui :: Color32 :: from_rgba_unmultiplied_const(137u8, 180u8, 250u8, 255u8),
+//         egui :: Color32 :: from_rgba_unmultiplied_const(203u8, 166u8, 247u8, 255u8),
+//         egui :: Color32 ::
+//         from_rgba_unmultiplied_const(242u8, 205u8, 205u8, 255u8)],
+//     }, "black-metal-bathory" => Base16
+//     {
+//         name : "Black Metal (Bathory)", is_dark : true, c :
+//         [egui :: Color32 :: from_rgba_unmultiplied_const(0u8, 0u8, 0u8, 255u8), egui
+//         :: Color32 :: from_rgba_unmultiplied_const(18u8, 18u8, 18u8, 255u8), egui ::
+//         Color32 :: from_rgba_unmultiplied_const(34u8, 34u8, 34u8, 255u8), egui ::
+//         Color32 :: from_rgba_unmultiplied_const(51u8, 51u8, 51u8, 255u8), egui ::
+//         Color32 :: from_rgba_unmultiplied_const(153u8, 153u8, 153u8, 255u8), egui ::
+//         Color32 :: from_rgba_unmultiplied_const(193u8, 193u8, 193u8, 255u8), egui ::
+//         Color32 :: from_rgba_unmultiplied_const(153u8, 153u8, 153u8, 255u8), egui ::
+//         Color32 :: from_rgba_unmultiplied_const(193u8, 193u8, 193u8, 255u8), egui ::
+//         Color32 :: from_rgba_unmultiplied_const(95u8, 135u8, 135u8, 255u8), egui ::
+//         Color32 :: from_rgba_unmultiplied_const(170u8, 170u8, 170u8, 255u8), egui ::
+//         Color32 :: from_rgba_unmultiplied_const(231u8, 138u8, 83u8, 255u8), egui ::
+//         Color32 :: from_rgba_unmultiplied_const(251u8, 203u8, 151u8, 255u8), egui ::
+//         Color32 :: from_rgba_unmultiplied_const(170u8, 170u8, 170u8, 255u8), egui ::
+//         Color32 :: from_rgba_unmultiplied_const(136u8, 136u8, 136u8, 255u8), egui ::
+//         Color32 :: from_rgba_unmultiplied_const(153u8, 153u8, 153u8, 255u8), egui ::
+//         Color32 :: from_rgba_unmultiplied_const(68u8, 68u8, 68u8, 255u8)],
+//     }, "gruvbox-light-hard" => Base16
+//     {
+//         name : "Gruvbox light, hard", is_dark : false, c :
+//         [egui :: Color32 ::
+//         from_rgba_unmultiplied_const(249u8, 245u8, 215u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(235u8, 219u8, 178u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(213u8, 196u8, 161u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(189u8, 174u8, 147u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(102u8, 92u8, 84u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(80u8, 73u8, 69u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(60u8, 56u8, 54u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(40u8, 40u8, 40u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(157u8, 0u8, 6u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(175u8, 58u8, 3u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(181u8, 118u8, 20u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(121u8, 116u8, 14u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(66u8, 123u8, 88u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(7u8, 102u8, 120u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(143u8, 63u8, 113u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(214u8, 93u8, 14u8, 255u8)],
+//     }, "atelier_seaside_light" => Base16
+//     {
+//         name : "Atelier Seaside Light", is_dark : false, c :
+//         [egui :: Color32 ::
+//         from_rgba_unmultiplied_const(244u8, 251u8, 244u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(207u8, 232u8, 207u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(140u8, 166u8, 140u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(128u8, 153u8, 128u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(104u8, 125u8, 104u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(94u8, 110u8, 94u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(36u8, 41u8, 36u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(19u8, 21u8, 19u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(230u8, 25u8, 60u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(135u8, 113u8, 29u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(152u8, 152u8, 27u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(41u8, 163u8, 41u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(25u8, 153u8, 179u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(61u8, 98u8, 245u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(173u8, 43u8, 238u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(230u8, 25u8, 195u8, 255u8)],
+//     }, "gruvbox-light-soft" => Base16
+//     {
+//         name : "Gruvbox light, soft", is_dark : false, c :
+//         [egui :: Color32 ::
+//         from_rgba_unmultiplied_const(242u8, 229u8, 188u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(235u8, 219u8, 178u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(213u8, 196u8, 161u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(189u8, 174u8, 147u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(102u8, 92u8, 84u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(80u8, 73u8, 69u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(60u8, 56u8, 54u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(40u8, 40u8, 40u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(157u8, 0u8, 6u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(175u8, 58u8, 3u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(181u8, 118u8, 20u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(121u8, 116u8, 14u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(66u8, 123u8, 88u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(7u8, 102u8, 120u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(143u8, 63u8, 113u8, 255u8), egui :: Color32 ::
+//         from_rgba_unmultiplied_const(214u8, 93u8, 14u8, 255u8)],
+//     }
+// };
+
 const SYNTAX_STR: &[(&str, &str)] = syntax_str!("PowerShell", "TOML_Syntax_Highlighting");
 const THEME_BYTES: &[(&str, &[u8])] = theme_bytes!("Dunkel_Theme", "Gruvbox_Light", "Spectacular");
-const CARGO_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
+// const CARGO_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
 /// Applies contrast colours to both egui themes; font sizes are always left at
 /// egui defaults so toggling never causes a scroll-position jump.
@@ -817,12 +923,18 @@ fn main() -> eframe::Result<()> {
 
     // let path = "assets/themes/atelier_seaside_light.yaml";
     // eprintln!("CARGO_MANIFEST_DIR={}", env!("CARGO_MANIFEST_DIR"));
-    let path = "assets/themes/gruvbox-light-soft.yaml";
-    let path = format!("{CARGO_MANIFEST_DIR}/{path}");
-    let theme = Base16::from_file(&path).unwrap_or_else(|e| {
-        eprintln!("failed to load {path}: {e}");
-        std::process::exit(1);
-    });
+    // let path = "assets/themes/gruvbox-light-soft.yaml";
+    // let path = "assets/themes/black-metal-bathory.yaml";
+    // let path = "assets/themes/catppuccin-mocha.yaml";
+    // let path = format!("{CARGO_MANIFEST_DIR}/{path}");
+    // let theme = Base16::from_file(&path).unwrap_or_else(|e| {
+    //     eprintln!("failed to load {path}: {e}");
+    //     std::process::exit(1);
+    // });
+    let key = "catppuccin-mocha";
+    let theme = THEME_MAP
+        .get(key)
+        .expect("Error retrieving theme {key} from preloaded theme map");
 
     eframe::run_native(
         "Markdown Viewer",
@@ -1338,7 +1450,7 @@ impl MarkdownApp {
 
 fn add_code_block_themes(cache: &mut CommonMarkCache) {
     for (name, syntax_yaml) in SYNTAX_STR {
-        eprintln!("name={}", name.to_lowercase());
+        // eprintln!("name={}", name.to_lowercase());
         if let Err(e) = cache.add_syntax_from_str(syntax_yaml, Some(&name.to_lowercase())) {
             eprintln!("failed to load {name}: {e}");
         }
@@ -2244,5 +2356,4 @@ fn customise_scrollbar(ui: &mut egui::Ui) {
     scroll.active_handle_opacity = 0.80;
 }
 
-mod base16;
 mod fast_svg_loader;

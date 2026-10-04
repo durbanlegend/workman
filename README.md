@@ -34,22 +34,22 @@ The interface language is chosen from your `LOCALE` or `LANG` environment variab
 
 The following languages are currently supported. Please report any mistakes in the AI-provided translations as issues on the `workman` GitHub repo. 
 
-| Code | Language | Code | Language |
-|------|----------|------|----------|
-| `af` | Afrikaans | `it` | Italiano
-| `bg` | Български | `nb`, `no`  | Norsk |
-| `ca` | Català | `nl` | Nederlands |
-| `cs` | Čeština | `pl` | Polski |
-| `cy` | Cymraeg | `pt` | Português |
-| `da` | Dansk | `ro` | Română |
-| `de` | Deutsch | `ru` | Русский |
-| `el` | Ελληνικά | `sk` | Slovenčina |
-| `en` | English | `sl` | Slovenščina |
-| `es` | Español | `st` | Sesotho |
-| `fi` | Suomi | `sv` | Svenska |
-| `fr` | Français | `uk` | Українська |
-| `hr` | Hrvatski | `xh` | isiXhosa |
-| `hu` | Magyar | `zu` | isiZulu |
+| Code | Language | | Code | Language |
+|------|----------|-|------|----------|
+| `af` | Afrikaans | | `it` | Italiano (Italian) |
+| `bg` | Български (Bulgarian) | | `nb`, `no` | Norsk (Norwegian) |
+| `ca` | Català (Catalan) | | `nl` | Nederlands (Dutch) |
+| `cs` | Čeština (Czech) | | `pl` | Polski (Polish) |
+| `cy` | Cymraeg (Welsh) | | `pt` | Português (Portuguese) |
+| `da` | Dansk (Danish) | | `ro` | Română (Romanian) |
+| `de` | Deutsch (German) | | `ru` | Русский (Russian) |
+| `el` | Ελληνικά (Greek) | | `sk` | Slovenčina (Slovak) |
+| `en` | English | | `sl` | Slovenščina (Slovenian) |
+| `es` | Español (Spanish) | | `st` | Sesotho (Southern Sotho) |
+| `fi` | Suomi (Finnish) | | `sv` | Svenska (Swedish) |
+| `fr` | Français (French) | | `uk` | Українська (Ukrainian) |
+| `hr` | Hrvatski (Croatian) | | `xh` | isiXhosa (Xhosa) |
+| `hu` | Magyar (Hungarian) | | `zu` | isiZulu (Zulu) |
 
 ## Installation
 
@@ -89,15 +89,16 @@ cargo install --path .
 workman [OPTIONS] [PATH]
 ```
 
-- `PATH`: optional initial markdown file to open.
+| `OPTIONS` |  |
+|-----------|--|
+| `-f, --foreground` |  Stay attached to the launching terminal (Unix only). Primarily for debugging.
+| `-h, --help` |  Print help.
+| `-s, --search-collapsible` |  Expand collapsible widgets to make them searchable.
+| `-V, --version` |  Print the version and exit.
+| | |
+| `PATH` |  Optional initial markdown file to open.
 
-- `--foreground`: stay attached to the launching terminal (Unix only). Primarily for debugging.
-
-- `-V`, `--version`: print the version and exit.
-
-- `-h`, `--help`: print help.
-
-On Unix systems, launching from a terminal automatically detaches the process so the terminal is returned immediately.
+On Unix systems, launching from a terminal without the `-f` option automatically detaches the process so the terminal is returned immediately.
 
 ## License
 

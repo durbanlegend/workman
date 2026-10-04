@@ -1,0 +1,20 @@
+[package]
+name = "macros"
+version.workspace = true
+authors = ["Don Forbes <don.forbes3@gmail.com>"]
+description = "Procedural macros for the workman project"
+repository = "https://github.com/durbanlegend/workman"
+license = "MIT OR Apache-2.0"
+edition = "2024"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+base16 = { path = "../base16" }
+eframe = { workspace = true }
+inline_colorization = "0.1"
+prettyplease = "0.3"
+proc-macro2 = "1.0"
+quote = { workspace = true }
+syn = { workspace = true }
