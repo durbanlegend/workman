@@ -3,7 +3,7 @@ mod fast_svg_loader;
 use base16::Base16;
 use eframe::egui;
 use egui::Color32;
-use egui::{Popup, PopupCloseBehavior, ScrollArea};
+use egui::{Key, Modifiers, Popup, PopupCloseBehavior, ScrollArea};
 use egui_commonmark::{CommonMarkCache, CommonMarkScrollOptions, CommonMarkViewer, SearchOptions};
 use macros::{preload_base16_themes, preload_syntect_themes};
 use notify::{RecursiveMode, Watcher};
@@ -14,13 +14,15 @@ use rust_i18n::t;
 use std::{
     collections::HashMap,
     env,
+    io::Cursor,
     path::{Path, PathBuf},
     sync::{
-        Arc,
+        Arc, OnceLock,
         mpsc::{self, Receiver},
     },
     time::{Duration, Instant},
 };
+use syntect::highlighting::{Color, ThemeSet};
 use thag_common::{auto_help, help_system::check_help_and_exit};
 /// A fast lightweight multi-lingual GUI markdown viewer.
 ///
@@ -99,6 +101,76 @@ preload_syntect_themes! {}
 const SYNTAX_STR: &[(&str, &str)] = syntax_str!("PowerShell", "TOML_Syntax_Highlighting");
 const DEFAULT_SYNTECT_THEME_DARK: &str = "Dunkel_Theme";
 const DEFAULT_SYNTECT_THEME_LIGHT: &str = "Eiffel";
+
+// ---------------------------------------------------------------------------
+// Sample document shown in the theme window
+// ---------------------------------------------------------------------------
+
+const SAMPLE_MD: &str = r##"
+# Theme preview
+
+Some *emphasis*, **strong text**, `inline code` and a [link](https://example.com).
+
+```rust
+fn main() {
+    let name = "world";
+    println!("Hello, {name}!");
+}
+```
+
+```toml
+[package]
+name = "demo"
+version = "0.1.0"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+```
+
+```powershell
+Get-ChildItem -Path . -Recurse |
+    Where-Object { $_.Length -gt 1MB } |
+    Sort-Object Length -Descending
+```
+
+```
+An unannotated code fence.
+No language, so no highlighting.
+```
+"##;
+
+// ---------------------------------------------------------------------------
+// Light/dark classification of the bundled .tmTheme files (computed once)
+// ---------------------------------------------------------------------------
+
+/// `(theme name, is_dark)` for every theme in `SYNTECT_THEME_MAP`, sorted by name.
+/// "Dark" means the theme's background colour has a luminance below 50%.
+/// A theme with no background setting is treated as light; one that fails to
+/// parse is skipped.
+fn syntect_themes() -> &'static [(&'static str, bool)] {
+    static THEMES: OnceLock<Vec<(&'static str, bool)>> = OnceLock::new();
+    THEMES.get_or_init(|| {
+        let mut v: Vec<_> = SYNTECT_THEME_MAP
+            .entries()
+            .filter_map(|(&name, &src)| {
+                let theme = ThemeSet::load_from_reader(&mut Cursor::new(src)).ok()?;
+                let bg = theme.settings.background.unwrap_or(Color::WHITE);
+                let lum = 0.299 * bg.r as f32 + 0.587 * bg.g as f32 + 0.114 * bg.b as f32;
+                Some((name, lum < 128.0))
+            })
+            .collect();
+        v.sort_unstable_by_key(|(name, _)| *name);
+        v
+    })
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+enum ThemeFilter {
+    /// Only syntect themes matching the current light/dark mode.
+    #[default]
+    Matching,
+    All,
+}
 
 /// Applies contrast colours to both egui themes; font sizes are always left at
 /// egui defaults so toggling never causes a scroll-position jump.
@@ -818,7 +890,7 @@ fn main() -> eframe::Result<()> {
     //     eprintln!("failed to load {path}: {e}");
     //     std::process::exit(1);
     // });
-    let key = "catppuccin-mocha";
+    let key = "gruvbox-light-hard";
     let theme = THEME_MAP.get(key);
     if theme.is_none() {
         eprintln!("Error retrieving theme {key} from preloaded theme map");
@@ -923,6 +995,9 @@ struct MarkdownApp {
     syntect_theme_dark: Option<&'static str>,
     /// The current `syntect` theme for code block highlighting in light mode, if overriding the app default.
     syntect_theme_light: Option<&'static str>,
+    theme_window_open: bool,
+    syntect_filter: ThemeFilter,
+    sample_cache: CommonMarkCache, // must know the syntect themes, as for your main cache
 }
 
 impl MarkdownApp {
@@ -963,11 +1038,15 @@ impl MarkdownApp {
             html: HtmlRenderer::new(path_to_file_uri(path)),
             search_collapsible,
             current_theme: None,
-            syntect_theme_dark: SYNTECT_THEME_MAP.get("Dunkel_Theme").map(|v| &**v),
-            syntect_theme_light: SYNTECT_THEME_MAP.get("Slush_and_Poppies").map(|v| &**v),
+            syntect_theme_dark: Some(DEFAULT_SYNTECT_THEME_DARK),
+            syntect_theme_light: Some(DEFAULT_SYNTECT_THEME_LIGHT),
+            theme_window_open: false,
+            syntect_filter: ThemeFilter::All,
+            sample_cache: CommonMarkCache::default(),
         };
         // eprintln!("CWD={}", std::env::current_dir().unwrap().display());
         add_code_block_themes(&mut app.cache);
+        add_code_block_themes(&mut app.sample_cache);
         app.start_watching();
         app.build_content_headings();
         app
@@ -1389,6 +1468,128 @@ impl MarkdownApp {
         }
         button
     }
+
+    /// Toolbar button: just toggles the window.
+    fn theme_button(&mut self, ui: &mut egui::Ui) {
+        if ui.button("🎨").on_hover_text("Themes…").clicked() {
+            self.theme_window_open = !self.theme_window_open;
+        }
+    }
+
+    /// Call once per frame (e.g. at the end of `update`). Draws nothing if closed.
+    fn theme_window(&mut self, ctx: &egui::Context) {
+        if !self.theme_window_open {
+            return;
+        }
+
+        // Esc closes the window, but not when it should only close an open
+        // popup/combo box (those handle Esc themselves).
+        if !egui::Popup::is_any_open(ctx)
+            && ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape))
+        {
+            self.theme_window_open = false;
+            return;
+        }
+
+        // `.open()` needs `&mut bool`; use a local to avoid borrowing `self`.
+        let mut open = true;
+
+        egui::Window::new("Themes")
+            .open(&mut open) // gives the title-bar close button
+            .collapsible(false)
+            .resizable(true)
+            .default_size([420.0, 500.0])
+            // Start near the top-right so the main document stays visible; still draggable.
+            .default_pos(ctx.content_rect().right_top() + egui::vec2(-440.0, 8.0))
+            .show(ctx, |ui| {
+                let dark = ui.visuals().dark_mode;
+
+                // --- Controls ---------------------------------------------
+                ui.horizontal(|ui| {
+                    ui.label("UI theme:");
+                    // self.theme_picker(ui, &THEME_MAP); // your existing Base16 popup method
+                    if self.theme_picker(ui, &THEME_MAP).changed()
+                        && let Some(theme) = &self.current_theme
+                    {
+                        // self.pending_theme = Some(self.themes[self.current_theme].clone());
+                        THEME_MAP
+                            .get(theme)
+                            .or_else(|| {
+                                eprintln!("Could not retrieve theme for key {theme}");
+                                None
+                            })
+                            .unwrap()
+                            .apply(ui.ctx());
+                    } else {
+                        // apply_style(ui.ctx(), true);
+                    }
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Code themes:");
+                    let which = if dark { "dark" } else { "light" };
+                    ui.radio_value(
+                        &mut self.syntect_filter,
+                        ThemeFilter::Matching,
+                        format!("Only {which}"),
+                    );
+                    ui.radio_value(&mut self.syntect_filter, ThemeFilter::All, "All");
+                });
+                let all = self.syntect_filter == ThemeFilter::All;
+
+                // The slot being edited depends on the current light/dark mode.
+                let (slot, default) = if dark {
+                    (&mut self.syntect_theme_dark, DEFAULT_SYNTECT_THEME_DARK)
+                } else {
+                    (&mut self.syntect_theme_light, DEFAULT_SYNTECT_THEME_LIGHT)
+                };
+
+                ui.horizontal(|ui| {
+                    ui.label(if dark {
+                        "Dark code theme:"
+                    } else {
+                        "Light code theme:"
+                    });
+                    egui::ComboBox::from_id_salt("syntect_theme")
+                        .selected_text(slot.unwrap_or("(default)"))
+                        .close_behavior(PopupCloseBehavior::CloseOnClickOutside)
+                        .height(300.0)
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(slot, None, format!("(default: {default})"));
+                            for &(name, is_dark) in
+                                syntect_themes().iter().filter(|(_, d)| all || *d == dark)
+                            {
+                                let label = if all {
+                                    format!("{} {name}", if is_dark { "🌙" } else { "☀" })
+                                } else {
+                                    name.to_owned()
+                                };
+                                ui.selectable_value(slot, Some(name), label);
+                            }
+                        });
+                });
+
+                ui.separator();
+
+                // --- Sample markdown --------------------------------------
+                ScrollArea::vertical()
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        CommonMarkViewer::new()
+                            .syntax_theme_dark(
+                                self.syntect_theme_dark
+                                    .unwrap_or(DEFAULT_SYNTECT_THEME_DARK),
+                            )
+                            .syntax_theme_light(
+                                self.syntect_theme_light
+                                    .unwrap_or(DEFAULT_SYNTECT_THEME_LIGHT),
+                            )
+                            .show(ui, &mut self.sample_cache, SAMPLE_MD);
+                    });
+            });
+
+        self.theme_window_open = open;
+    }
 }
 
 fn add_code_block_themes(cache: &mut CommonMarkCache) {
@@ -1619,22 +1820,7 @@ impl eframe::App for MarkdownApp {
                     }
                 });
 
-                if self.theme_picker(ui, &THEME_MAP).changed()
-                    && let Some(theme) = &self.current_theme
-                {
-                    // self.pending_theme = Some(self.themes[self.current_theme].clone());
-                    THEME_MAP
-                        .get(theme)
-                        .or_else(|| {
-                            eprintln!("Could not retrieve theme for key {theme}");
-                            None
-                        })
-                        .unwrap()
-                        .apply(ui.ctx());
-                } else {
-                    // apply_style(ui.ctx(), true);
-                }
-
+                self.theme_button(ui);
                 ui.separator();
 
                 if ui
@@ -2316,6 +2502,8 @@ impl eframe::App for MarkdownApp {
             ui.ctx().send_viewport_cmd(egui::ViewportCommand::Focus);
             self.first_frame = false;
         }
+
+        self.theme_window(ui.ctx());
     }
 }
 

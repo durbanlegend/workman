@@ -59,6 +59,8 @@ rfd = "0.15"
 rust-i18n = "4"
 scraper = "0.27.0"
 serde_yaml = "0.9"
+# Pinned to ensure it won't pull a newer fancy-regex without us changing ours below:
+syntect = { version = "=5.3.0", default-features = false, features = ["default-fancy"] }
 sys-locale = "0.3"
 thag_common = "1"
 

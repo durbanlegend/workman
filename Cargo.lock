@@ -5768,6 +5768,7 @@ dependencies = [
  "rust-i18n",
  "scraper",
  "serde_yaml",
+ "syntect",
  "sys-locale",
  "thag_common",
 ]
