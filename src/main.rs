@@ -3,8 +3,9 @@ mod fast_svg_loader;
 use base16::Base16;
 use eframe::egui;
 use egui::Color32;
+use egui::{Popup, PopupCloseBehavior, ScrollArea};
 use egui_commonmark::{CommonMarkCache, CommonMarkScrollOptions, CommonMarkViewer, SearchOptions};
-use macros::preload_themes;
+use macros::{preload_base16_themes, preload_syntect_themes};
 use notify::{RecursiveMode, Watcher};
 use phf::Map;
 use pulldown_cmark::{Event, Options, Parser, Tag};
@@ -89,36 +90,13 @@ macro_rules! syntax_str {
     };
 }
 
-macro_rules! theme_bytes {
-    ($($theme:literal),+ $(,)?) => {
-        &[
-            $(
-                (
-                    $theme,
-                    include_bytes!(concat!(
-                        env!("CARGO_MANIFEST_DIR"),
-                        "/assets/sublime_themes/",
-                        $theme,
-                        ".tmTheme"
-                    ))
-                ),
-            )+
-        ]
-    };
-}
-
 // Preload Base16 themes from the `assets/themes` directory into a static HashMap `THEME_MAP`.
-preload_themes! {}
+preload_base16_themes! {}
 
-// const THEMES: Vec<&&str> = {
-//     let mut themes = THEME_MAP.keys().collect::<Vec<_>>();
-//     themes.sort();
-//     themes
-// };
+// Preload Syntect themes from the `assets/sublime_themes` directory into a static HashMap `SYNTECT_THEME_MAP`.
+preload_syntect_themes! {}
 
 const SYNTAX_STR: &[(&str, &str)] = syntax_str!("PowerShell", "TOML_Syntax_Highlighting");
-const THEME_BYTES: &[(&str, &[u8])] = theme_bytes!("Dunkel_Theme", "Gruvbox_Light", "Spectacular");
-// const CARGO_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
 /// Applies contrast colours to both egui themes; font sizes are always left at
 /// egui defaults so toggling never causes a scroll-position jump.
@@ -937,8 +915,12 @@ struct MarkdownApp {
     html: HtmlRenderer,
     /// Whether to expand disclosure widgets to expose them to the `egui_commonmark` search facility.
     search_collapsible: bool,
+    /// The current `Base16` markdown theme, if overriding `egui` defaults.
     current_theme: Option<String>,
-    // pending_theme: Option<String>,
+    /// The current `syntect` theme for code block highlighting in dark mode, if overriding the app default.
+    syntect_theme_dark: Option<&'static str>,
+    /// The current `syntect` theme for code block highlighting in light mode, if overriding the app default.
+    syntect_theme_light: Option<&'static str>,
 }
 
 impl MarkdownApp {
@@ -979,6 +961,8 @@ impl MarkdownApp {
             html: HtmlRenderer::new(path_to_file_uri(path)),
             search_collapsible,
             current_theme: None,
+            syntect_theme_dark: SYNTECT_THEME_MAP.get("Dunkel_Theme").map(|v| &**v),
+            syntect_theme_light: SYNTECT_THEME_MAP.get("Slush_and_Poppies").map(|v| &**v),
         };
         // eprintln!("CWD={}", std::env::current_dir().unwrap().display());
         add_code_block_themes(&mut app.cache);
@@ -1260,7 +1244,6 @@ impl MarkdownApp {
         let (id_injected, toc) = extract_toc_and_inject_ids(&self.raw_content);
         self.content = absolutize_image_paths(&id_injected, &canonical_initial_path);
         self.toc = toc;
-        // let new_show_toc = true;
         self.show_toc = true;
         self.html = HtmlRenderer::new(path_to_file_uri(&canonical_initial_path));
         self.current_file_path = canonical_initial_path;
@@ -1417,8 +1400,10 @@ fn add_code_block_themes(cache: &mut CommonMarkCache) {
             eprintln!("failed to load {name}: {e}");
         }
     }
-    for (theme, bytes) in THEME_BYTES {
-        cache.add_syntax_theme_from_bytes(*theme, bytes).unwrap();
+    for (theme, plist_content) in &SYNTECT_THEME_MAP {
+        cache
+            .add_syntax_theme_from_bytes(*theme, plist_content.as_bytes())
+            .unwrap();
     }
 }
 
@@ -2174,8 +2159,8 @@ impl eframe::App for MarkdownApp {
             // (cheap, Rc-backed) clone rather than borrow `self.html`.
             let html = self.html.clone();
             CommonMarkViewer::new()
-                .syntax_theme_dark("Dunkel_Theme") // Must be one listed in THEME_BYTES
-                .syntax_theme_light("Gruvbox_Light") // Must be one listed in THEME_BYTES
+                .syntax_theme_dark(self.syntect_theme_dark.unwrap_or("Dunkel_Theme"))
+                .syntax_theme_light(self.syntect_theme_light.unwrap_or("Eiffel"))
                 .search_match_color(match_bg)
                 .search_active_match_color(active_bg)
                 .enable_scroll_to_heading(true)
@@ -2346,43 +2331,3 @@ fn customise_scrollbar(ui: &mut egui::Ui) {
     scroll.interact_handle_opacity = 0.55;
     scroll.active_handle_opacity = 0.80;
 }
-
-use egui::{Popup, PopupCloseBehavior, ScrollArea};
-
-// pub fn theme_picker(
-//     ui: &mut egui::Ui,
-//     themes: &Map<&'static str, Base16>,
-//     mut selected: Option<&mut String>,
-// ) -> egui::Response {
-//     // HashMap order is arbitrary; sort so the list doesn't shuffle.
-//     let mut names: Vec<&'static str> = themes.keys().copied().collect();
-//     names.sort_unstable();
-
-//     let mut button = ui.button("🎨").on_hover_text(format!(
-//         "Theme: {}",
-//         selected.as_ref().unwrap_or(&&mut String::from("None"))
-//     ));
-//     let mut changed = false;
-
-//     Popup::menu(&button)
-//         .close_behavior(PopupCloseBehavior::CloseOnClickOutside)
-//         .show(|ui| {
-//             ui.set_min_width(140.0);
-//             ScrollArea::vertical().max_height(300.0).show(ui, |ui| {
-//                 for name in names {
-//                     if ui
-//                         .selectable_label(selected == Some(&mut name.to_string()), name)
-//                         .clicked()
-//                     {
-//                         selected = Some(&mut name.to_string().clone());
-//                         changed = true;
-//                     }
-//                 }
-//             });
-//         });
-
-//     if changed {
-//         button.mark_changed();
-//     }
-//     button
-// }

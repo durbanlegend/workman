@@ -1,33 +1,26 @@
 #![allow(clippy::module_name_repetitions)]
 use base16::Base16;
-// use eframe::egui;
-// use egui::Color32;
 use proc_macro::TokenStream;
 use quote::quote;
 use std::env;
-// use std::collections::HashMap;
 
-#[allow(clippy::too_many_lines)]
-pub fn preload_themes_impl(_input: TokenStream) -> TokenStream {
+pub fn preload_base16_themes_impl(_input: TokenStream) -> TokenStream {
     // eprintln!("\ncurrent_dir={:?}", env::current_dir());
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
     // eprintln!("The project manifest directory is: {manifest_dir}");
     let themes_dir = manifest_dir + "/assets/themes";
     // let themes_dir = "/Users/donf/projects/schemes-spec-0.11/base16/";
 
-    let mut theme_indices = Vec::new();
-    // let mut themes: HashMap<[u8; 3], Vec<String>> = HashMap::new();
+    let mut theme_mappings = Vec::new();
 
-    #[allow(clippy::map_unwrap_or, clippy::unnecessary_map_or)]
     for entry in std::fs::read_dir(themes_dir).unwrap() {
         let path = entry.unwrap().path();
         // Skip hidden files like .DS_Store and read only `.yaml` files
-        if path.file_name().and_then(|n| n.to_str()).map_or(true, |n| {
+        if path.file_name().and_then(|n| n.to_str()).is_none_or(|n| {
             n.starts_with('.')
                 || !std::path::Path::new(n)
                     .extension()
-                    .map(|ext| ext.eq_ignore_ascii_case("yaml"))
-                    .unwrap_or(false)
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("yaml"))
         }) {
             continue;
         }
@@ -61,17 +54,15 @@ pub fn preload_themes_impl(_input: TokenStream) -> TokenStream {
                 c: [ #(#color_tokens),* ],
             }
         };
-        theme_indices.push(theme_mapping);
+        theme_mappings.push(theme_mapping);
     }
 
     // eprintln!("Done!");
 
     quote! {
         /// A static HashMap mapping theme names to preloaded themes
-        // static THEME_MAP: LazyLock<HashMap<phf::Map<&'static str, Base16>>> = LazyLock::new(||
-        // phf::phf_map! {
         static THEME_MAP: phf::Map<&'static str, Base16> = phf::phf_map! {
-                #(#theme_indices),*
+                #(#theme_mappings),*
             };
     }
     .into()

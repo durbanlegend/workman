@@ -1,21 +1,46 @@
-mod preload_themes;
+mod preload_base16_themes;
+mod preload_syntect_themes;
 
-use crate::preload_themes::preload_themes_impl;
+use crate::preload_base16_themes::preload_base16_themes_impl;
+use crate::preload_syntect_themes::preload_syntect_themes_impl;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{Expr, parse_file, parse_str};
 
-/// Preload visual themes into memory at compile time.
+/// Preload visual themes for markdown into memory at compile time.
 ///
 /// Syntax:
 ///
 /// ```Rust
-///     preload_themes! {}
+///     preload_base16_themes! {}
 /// ```
 ///
 #[proc_macro]
-pub fn preload_themes(input: TokenStream) -> TokenStream {
-    maybe_expand_proc_macro(false, "preload_themes", &input, preload_themes_impl)
+pub fn preload_base16_themes(input: TokenStream) -> TokenStream {
+    maybe_expand_proc_macro(
+        false,
+        "preload_base16_themes",
+        &input,
+        preload_base16_themes_impl,
+    )
+}
+
+/// Preload visual themes for code block highlighting into memory at compile time.
+///
+/// Syntax:
+///
+/// ```Rust
+///     preload_syntect_themes! {}
+/// ```
+///
+#[proc_macro]
+pub fn preload_syntect_themes(input: TokenStream) -> TokenStream {
+    maybe_expand_proc_macro(
+        false,
+        "preload_syntect_themes",
+        &input,
+        preload_syntect_themes_impl,
+    )
 }
 
 fn maybe_expand_proc_macro<F>(
