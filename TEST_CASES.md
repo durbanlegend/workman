@@ -167,6 +167,34 @@ Check out our product demo video below:
 
 ---
 
+## Legibility of TOML and Powershell code blocks
+
+### Raw
+
+    ```toml
+    [dependencies]
+    prettyplease = "0.2.32"
+    syn = { version = "2", default-features = false, features = ["full", "parsing"] }
+    ```
+    
+    ```powershell
+    powershell -ExecutionPolicy Bypass -c "irm https://github.com/durbanlegend/workman/releases/latest/download/workman-installer.ps1 | iex"
+    ```
+
+### Rendered
+
+```toml
+[dependencies]
+prettyplease = "0.2.32"
+syn = { version = "2", default-features = false, features = ["full", "parsing"] }
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/durbanlegend/workman/releases/latest/download/workman-installer.ps1 | iex"
+```
+
+---
+
 ## Legibility of un-annotated code blocks
 
 ### Raw

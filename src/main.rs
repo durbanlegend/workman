@@ -1167,10 +1167,10 @@ impl MarkdownApp {
         if self.can_go_back() {
             self.history_index -= 1;
             let path = self.history[self.history_index].clone();
-            eprintln!(
-                "Succeeded in self.go_back(), self.history_index={}",
-                self.history_index
-            );
+            // eprintln!(
+            //     "Succeeded in self.go_back(), self.history_index={}",
+            //     self.history_index
+            // );
             self.load_file(path)
         } else {
             eprintln!(
@@ -1186,10 +1186,10 @@ impl MarkdownApp {
         if self.can_go_forward() {
             self.history_index += 1;
             let path = self.history[self.history_index].clone();
-            eprintln!(
-                "Succeeded in self.go_forward(), self.history_index={}",
-                self.history_index
-            );
+            // eprintln!(
+            //     "Succeeded in self.go_forward(), self.history_index={}",
+            //     self.history_index
+            // );
             self.load_file(path)
         } else {
             eprintln!(
@@ -1614,6 +1614,7 @@ impl eframe::App for MarkdownApp {
                         // }
                         self.current_theme = None;
                         ui.ctx().set_theme(egui::ThemePreference::System);
+                        apply_style(ui.ctx(), true);
                     }
                     if ui
                         .button("🌙")
@@ -1622,6 +1623,7 @@ impl eframe::App for MarkdownApp {
                     {
                         self.current_theme = None;
                         ui.ctx().set_theme(egui::ThemePreference::Dark);
+                        apply_style(ui.ctx(), true);
                     }
                     if ui
                         .button("☀")
@@ -1630,6 +1632,7 @@ impl eframe::App for MarkdownApp {
                     {
                         self.current_theme = None;
                         ui.ctx().set_theme(egui::ThemePreference::Light);
+                        apply_style(ui.ctx(), true);
                     }
                 });
 
@@ -1649,8 +1652,10 @@ impl eframe::App for MarkdownApp {
                             eprintln!("Could not retrieve theme for key {theme}");
                             None
                         })
-                        .expect("REASON")
+                        .unwrap()
                         .apply(ui.ctx());
+                } else {
+                    // apply_style(ui.ctx(), true);
                 }
 
                 ui.separator();
@@ -2170,7 +2175,7 @@ impl eframe::App for MarkdownApp {
             let html = self.html.clone();
             CommonMarkViewer::new()
                 .syntax_theme_dark("Dunkel_Theme") // Must be one listed in THEME_BYTES
-                .syntax_theme_light("Spectacular") // Must be one listed in THEME_BYTES
+                .syntax_theme_light("Gruvbox_Light") // Must be one listed in THEME_BYTES
                 .search_match_color(match_bg)
                 .search_active_match_color(active_bg)
                 .enable_scroll_to_heading(true)
