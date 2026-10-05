@@ -97,6 +97,8 @@ preload_base16_themes! {}
 preload_syntect_themes! {}
 
 const SYNTAX_STR: &[(&str, &str)] = syntax_str!("PowerShell", "TOML_Syntax_Highlighting");
+const DEFAULT_SYNTECT_THEME_DARK: &str = "Dunkel_Theme";
+const DEFAULT_SYNTECT_THEME_LIGHT: &str = "Eiffel";
 
 /// Applies contrast colours to both egui themes; font sizes are always left at
 /// egui defaults so toggling never causes a scroll-position jump.
@@ -916,7 +918,7 @@ struct MarkdownApp {
     /// Whether to expand disclosure widgets to expose them to the `egui_commonmark` search facility.
     search_collapsible: bool,
     /// The current `Base16` markdown theme, if overriding `egui` defaults.
-    current_theme: Option<String>,
+    current_theme: Option<&'static str>,
     /// The current `syntect` theme for code block highlighting in dark mode, if overriding the app default.
     syntect_theme_dark: Option<&'static str>,
     /// The current `syntect` theme for code block highlighting in light mode, if overriding the app default.
@@ -1355,18 +1357,14 @@ impl MarkdownApp {
         &mut self,
         ui: &mut egui::Ui,
         themes: &Map<&'static str, Base16>,
-        // mut selected: Option<&mut String>,
     ) -> egui::Response {
         // HashMap order is arbitrary; sort so the list doesn't shuffle.
         let mut names: Vec<&'static str> = themes.keys().copied().collect();
         names.sort_unstable();
 
-        let mut button = ui.button("🎨").on_hover_text(format!(
-            "Theme: {}",
-            self.current_theme
-                .clone()
-                .unwrap_or_else(|| String::from("None"))
-        ));
+        let mut button = ui
+            .button("🎨")
+            .on_hover_text(format!("Theme: {}", self.current_theme.unwrap_or("None")));
         let mut changed = false;
 
         Popup::menu(&button)
@@ -1376,10 +1374,10 @@ impl MarkdownApp {
                 ScrollArea::vertical().max_height(300.0).show(ui, |ui| {
                     for name in names {
                         if ui
-                            .selectable_label(self.current_theme == Some(name.to_string()), name)
+                            .selectable_label(self.current_theme == Some(name), name)
                             .clicked()
                         {
-                            self.current_theme = Some(name.to_string());
+                            self.current_theme = Some(name);
                             changed = true;
                         }
                     }
@@ -1621,13 +1619,7 @@ impl eframe::App for MarkdownApp {
                     }
                 });
 
-                if self
-                    .theme_picker(
-                        ui,
-                        &THEME_MAP,
-                        // self.current_theme.as_mut(), /*.map(|s| s.as_mut_str())*/
-                    )
-                    .changed()
+                if self.theme_picker(ui, &THEME_MAP).changed()
                     && let Some(theme) = &self.current_theme
                 {
                     // self.pending_theme = Some(self.themes[self.current_theme].clone());
@@ -2159,8 +2151,14 @@ impl eframe::App for MarkdownApp {
             // (cheap, Rc-backed) clone rather than borrow `self.html`.
             let html = self.html.clone();
             CommonMarkViewer::new()
-                .syntax_theme_dark(self.syntect_theme_dark.unwrap_or("Dunkel_Theme"))
-                .syntax_theme_light(self.syntect_theme_light.unwrap_or("Eiffel"))
+                .syntax_theme_dark(
+                    self.syntect_theme_dark
+                        .unwrap_or(DEFAULT_SYNTECT_THEME_DARK),
+                )
+                .syntax_theme_light(
+                    self.syntect_theme_light
+                        .unwrap_or(DEFAULT_SYNTECT_THEME_LIGHT),
+                )
                 .search_match_color(match_bg)
                 .search_active_match_color(active_bg)
                 .enable_scroll_to_heading(true)
