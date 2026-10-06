@@ -2,7 +2,6 @@ use eframe::egui;
 use egui::{Color32, Stroke, Visuals};
 use std::{error::Error, fs, path::Path};
 
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Base16 {
     pub name: &'static str,

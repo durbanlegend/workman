@@ -14,7 +14,7 @@ A fast, lightweight, multi-lingual GUI markdown viewer, built with [egui](https:
 
 - Large document support.
 
-- Light/dark/system theme switching.
+- Customise the look from the toolbar with built-in, external or default light and dark themes.
 
 - Zoom and font scaling with reset.
 
@@ -22,7 +22,7 @@ A fast, lightweight, multi-lingual GUI markdown viewer, built with [egui](https:
 
 - Full-document search with options for case (in)sensitive, whole word and regular expression searches.
 
-- Search across mixed text and code spans and link anchors.
+- Search seamlessly matches across embedded code spans and link anchors in text.
 
 - Automatic live file watching and refresh.
 
@@ -99,6 +99,16 @@ workman [OPTIONS] [PATH]
 | `PATH` |  Optional initial markdown file to open.
 
 On Unix systems, launching from a terminal without the `-f` option automatically detaches the process so the terminal is returned immediately.
+
+## Theming
+
+You can tailor the look of _Workman_ quite extensively to suit your individual needs and preferences.
+
+The palette 🎨 button on the toolbar opens a _Themes_ window where you can try out and choose from a gallery of built-in themes, or `TODO` choose one from an external `base16` or `base24` `.yaml` file that you load yourself. A wide selection is available at `https://github.com/tinted-theming/schemes/blob/spec-0.11/README.md`
+
+Code blocks in markdown have their own separate highlighting system. From the same window you can try out `syntect` code block highlighting themes and choose one to go with your markdown theme. A wide selection is available at `https://inkdeep.github.io/TextMate-Themes`
+
+The `Esc` key is a keyboard shortcut to close the  _Themes_ window.
 
 ## License
 

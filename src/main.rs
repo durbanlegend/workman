@@ -106,7 +106,7 @@ const DEFAULT_SYNTECT_THEME_LIGHT: &str = "Eiffel";
 // Sample document shown in the theme window
 // ---------------------------------------------------------------------------
 
-const SAMPLE_MD: &str = r##"
+const SAMPLE_MD: &str = r#"
 # Theme preview
 
 Some *emphasis*, **strong text**, `inline code` and a [link](https://example.com).
@@ -137,7 +137,7 @@ Get-ChildItem -Path . -Recurse |
 An unannotated code fence.
 No language, so no highlighting.
 ```
-"##;
+"#;
 
 // ---------------------------------------------------------------------------
 // Light/dark classification of the bundled .tmTheme files (computed once)
@@ -155,7 +155,11 @@ fn syntect_themes() -> &'static [(&'static str, bool)] {
             .filter_map(|(&name, &src)| {
                 let theme = ThemeSet::load_from_reader(&mut Cursor::new(src)).ok()?;
                 let bg = theme.settings.background.unwrap_or(Color::WHITE);
-                let lum = 0.299 * bg.r as f32 + 0.587 * bg.g as f32 + 0.114 * bg.b as f32;
+                // let lum = 0.299 * bg.r as f32 + 0.587 * bg.g as f32 + 0.114 * bg.b as f32;
+                let lum = 0.114f32.mul_add(
+                    f32::from(bg.b),
+                    0.587f32.mul_add(f32::from(bg.g), 0.299 * f32::from(bg.r)),
+                );
                 Some((name, lum < 128.0))
             })
             .collect();
@@ -1506,7 +1510,7 @@ impl MarkdownApp {
 
                 // --- Controls ---------------------------------------------
                 ui.horizontal(|ui| {
-                    ui.label("UI theme:");
+                    ui.label("Main theme:");
                     // self.theme_picker(ui, &THEME_MAP); // your existing Base16 popup method
                     if self.theme_picker(ui, &THEME_MAP).changed()
                         && let Some(theme) = &self.current_theme
