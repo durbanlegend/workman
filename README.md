@@ -102,11 +102,11 @@ On Unix systems, launching from a terminal without the `-f` option automatically
 
 ## Theming
 
-You can tailor the look of _Workman_ quite extensively to suit your individual needs and preferences.
+You can tailor the look of _Workman_ quite extensively to suit your individual preferences.
 
-The palette 🎨 button on the toolbar opens a _Themes_ window where you can try out and choose from a gallery of built-in themes, or `TODO` choose one from an external `base16` or `base24` `.yaml` file that you load yourself. A wide selection is available at `https://github.com/tinted-theming/schemes/blob/spec-0.11/README.md`
+The palette 🎨 button on the toolbar opens a _Themes_ window where you can try out and choose from a gallery of built-in themes, or choose one from an external `base16` or `base24` `.yaml` file that you load yourself. A wide selection is available to browse and download at [tinted-theming](https://github.com/tinted-theming/schemes/blob/spec-0.11/README.md).
 
-Code blocks in markdown have their own separate highlighting system. From the same window you can try out `syntect` code block highlighting themes and choose one to go with your markdown theme. A wide selection is available at `https://inkdeep.github.io/TextMate-Themes`
+Code blocks in markdown have their own separate highlighting system. From the same window you can try out and choose from a gallery of `syntect` code block highlighting themes to go with your markdown theme, or `TODO` choose one from an external `.tmYheme` file that you load yourself. A wide selection is available to browse and download at [TextMate-Themes](https://inkdeep.github.io/TextMate-Themes).
 
 The `Esc` key is a keyboard shortcut to close the  _Themes_ window.
 

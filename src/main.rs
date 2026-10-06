@@ -7,7 +7,6 @@ use egui::{Key, Modifiers, Popup, PopupCloseBehavior, ScrollArea};
 use egui_commonmark::{CommonMarkCache, CommonMarkScrollOptions, CommonMarkViewer, SearchOptions};
 use macros::{preload_base16_themes, preload_syntect_themes};
 use notify::{RecursiveMode, Watcher};
-use phf::Map;
 use pulldown_cmark::{Event, Options, Parser, Tag};
 use rfd::FileDialog;
 use rust_i18n::t;
@@ -102,6 +101,117 @@ const SYNTAX_STR: &[(&str, &str)] = syntax_str!("PowerShell", "TOML_Syntax_Highl
 const DEFAULT_SYNTECT_THEME_DARK: &str = "Dunkel_Theme";
 const DEFAULT_SYNTECT_THEME_LIGHT: &str = "Eiffel";
 
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+enum Base16Filter {
+    Light,
+    Dark,
+    #[default]
+    All,
+}
+
+impl Base16Filter {
+    const fn allows(self, is_dark: bool) -> bool {
+        match self {
+            Self::All => true,
+            Self::Dark => is_dark,
+            Self::Light => !is_dark,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Minimal Base16 YAML parsing (no YAML crate needed)
+//
+// Handles both layouts:
+//   old:  scheme: "Name"        / base00: "181818" ...
+//   new:  name: "Name" / variant: "dark" / palette: { base00: "181818" ... }
+// Only flat `key: value` lines are understood, which covers every published
+// Base16 / tinted-theming scheme file.
+// ---------------------------------------------------------------------------
+
+fn yaml_scalar(v: &str) -> String {
+    let v = v.trim();
+    if let Some(q) = v.chars().next().filter(|&c| c == '"' || c == '\'') {
+        return v[1..].split(q).next().unwrap_or("").to_owned();
+    }
+    v.split(" #").next().unwrap_or("").trim().to_owned()
+}
+
+#[allow(clippy::cast_possible_truncation)]
+fn parse_hex(s: &str) -> Result<Color32, String> {
+    let s = s.trim_start_matches('#');
+    let bad = || format!("invalid colour {s:?}");
+    if s.len() != 6 {
+        return Err(bad());
+    }
+    let n = u32::from_str_radix(s, 16).map_err(|_| bad())?;
+    Ok(Color32::from_rgb((n >> 16) as u8, (n >> 8) as u8, n as u8))
+}
+
+fn parse_base16_yaml(src: &str, fallback_name: &str) -> Result<Base16, String> {
+    let mut name = None;
+    let mut variant = None;
+    let mut c: [Option<Color32>; 16] = [None; 16];
+
+    for line in src.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let Some((key, value)) = line.split_once(':') else {
+            continue;
+        };
+        let key = key.trim().trim_matches(|ch| ch == '"' || ch == '\'');
+        let value = yaml_scalar(value);
+
+        match key {
+            "name" | "scheme" => name = Some(value),
+            "variant" => variant = Some(value.to_ascii_lowercase()),
+            _ => {
+                if let Some(hex) = key.strip_prefix("base").filter(|h| h.len() == 2) && let Ok(i) = usize::from_str_radix(hex, 16)
+                        // ignore extra base24 fields
+                        && i < c.len()
+                {
+                    // eprintln!("key={key}, i={i}");
+                    c[i] = Some(parse_hex(&value).map_err(|e| format!("{key}: {e}"))?);
+                }
+            }
+        }
+    }
+
+    let missing: Vec<String> = (0..16)
+        .filter(|&i| c[i].is_none())
+        .map(|i| format!("base{i:02X}"))
+        .collect();
+    if !missing.is_empty() {
+        return Err(format!("missing {}", missing.join(", ")));
+    }
+    let c: [Color32; 16] = c.map(|x| x.unwrap());
+
+    // Prefer an explicit `variant`; otherwise judge by base00 (the background).
+    let is_dark = match variant.as_deref() {
+        Some("dark") => true,
+        Some("light") => false,
+        _ => {
+            let bg = c[0];
+            // 0.299 * bg.r() as f32 + 0.587 * bg.g() as f32 + 0.114 * (bg.b() as f32) < 128.0
+            0.114_f32.mul_add(
+                f32::from(bg.b()),
+                0.587_f32.mul_add(f32::from(bg.g()), 0.299 * f32::from(bg.r())),
+            ) < 128.0
+        }
+    };
+
+    // Themes are keyed by `&'static str`, so loaded names are leaked. That's a
+    // few bytes per file the user chooses to load.
+    let name: &'static str = Box::leak(
+        name.unwrap_or_else(|| fallback_name.to_owned())
+            .into_boxed_str(),
+    );
+
+    Ok(Base16 { name, is_dark, c })
+}
+
 // ---------------------------------------------------------------------------
 // Sample document shown in the theme window
 // ---------------------------------------------------------------------------
@@ -156,9 +266,9 @@ fn syntect_themes() -> &'static [(&'static str, bool)] {
                 let theme = ThemeSet::load_from_reader(&mut Cursor::new(src)).ok()?;
                 let bg = theme.settings.background.unwrap_or(Color::WHITE);
                 // let lum = 0.299 * bg.r as f32 + 0.587 * bg.g as f32 + 0.114 * bg.b as f32;
-                let lum = 0.114f32.mul_add(
+                let lum = 0.114_f32.mul_add(
                     f32::from(bg.b),
-                    0.587f32.mul_add(f32::from(bg.g), 0.299 * f32::from(bg.r)),
+                    0.587_f32.mul_add(f32::from(bg.g), 0.299 * f32::from(bg.r)),
                 );
                 Some((name, lum < 128.0))
             })
@@ -993,6 +1103,8 @@ struct MarkdownApp {
     html: HtmlRenderer,
     /// Whether to expand disclosure widgets to expose them to the `egui_commonmark` search facility.
     search_collapsible: bool,
+    /// The collection of available themes
+    themes: HashMap<&'static str, Base16>,
     /// The current `Base16` markdown theme, if overriding `egui` defaults.
     current_theme: Option<&'static str>,
     /// The current `syntect` theme for code block highlighting in dark mode, if overriding the app default.
@@ -1002,6 +1114,8 @@ struct MarkdownApp {
     theme_window_open: bool,
     syntect_filter: ThemeFilter,
     sample_cache: CommonMarkCache, // must know the syntect themes, as for your main cache
+    base16_filter: Base16Filter,   // Default => All
+    base16_load_error: Option<String>,
 }
 
 impl MarkdownApp {
@@ -1041,12 +1155,18 @@ impl MarkdownApp {
             use_viewport_cache: content_len >= &VIEWPORT_CACHE_THRESHOLD,
             html: HtmlRenderer::new(path_to_file_uri(path)),
             search_collapsible,
+            themes: THEME_MAP
+                .entries()
+                .map(|(&k, v)| (k, v.clone())) // Clones the value, keeps the &'static str key
+                .collect(),
             current_theme: None,
             syntect_theme_dark: Some(DEFAULT_SYNTECT_THEME_DARK),
             syntect_theme_light: Some(DEFAULT_SYNTECT_THEME_LIGHT),
             theme_window_open: false,
             syntect_filter: ThemeFilter::All,
             sample_cache: CommonMarkCache::default(),
+            base16_filter: Base16Filter::All,
+            base16_load_error: None,
         };
         // eprintln!("CWD={}", std::env::current_dir().unwrap().display());
         add_code_block_themes(&mut app.cache);
@@ -1436,41 +1556,62 @@ impl MarkdownApp {
     /// on a click outside it or on `Esc`. `selected` is updated on each click and
     /// the returned `Response` reports `changed()` for that frame, so you can look
     /// up `themes[*selected]` and apply it on the next render.
-    fn theme_picker(
-        &mut self,
-        ui: &mut egui::Ui,
-        themes: &Map<&'static str, Base16>,
-    ) -> egui::Response {
-        // HashMap order is arbitrary; sort so the list doesn't shuffle.
-        let mut names: Vec<&'static str> = themes.keys().copied().collect();
-        names.sort_unstable();
-
-        let mut button = ui
-            .button("🎨")
-            .on_hover_text(format!("Theme: {}", self.current_theme.unwrap_or("None")));
-        let mut changed = false;
+    /// Button shows the current theme; popup has light/dark/all radios + list.
+    fn theme_picker(&mut self, ui: &mut egui::Ui) {
+        let button = ui
+            .button(format!("🎨 {}", self.current_theme.unwrap_or("Default")))
+            .on_hover_text("Choose a UI theme");
 
         Popup::menu(&button)
             .close_behavior(PopupCloseBehavior::CloseOnClickOutside)
             .show(|ui| {
-                ui.set_min_width(140.0);
+                ui.set_min_width(180.0);
+
+                ui.horizontal(|ui| {
+                    ui.radio_value(&mut self.base16_filter, Base16Filter::Light, "☀ Light");
+                    ui.radio_value(&mut self.base16_filter, Base16Filter::Dark, "🌙 Dark");
+                    ui.radio_value(&mut self.base16_filter, Base16Filter::All, "All");
+                });
+                ui.separator();
+
+                // Built after the radios so a filter change applies this frame.
+                let mut names: Vec<&'static str> = self
+                    .themes
+                    .iter()
+                    .filter(|(_, t)| self.base16_filter.allows(t.is_dark))
+                    .map(|(&k, _)| k)
+                    .collect();
+                names.sort_unstable();
+
                 ScrollArea::vertical().max_height(300.0).show(ui, |ui| {
+                    if ui
+                        .selectable_label(self.current_theme.is_none(), "(egui default)")
+                        .clicked()
+                    {
+                        self.current_theme = None;
+                    }
                     for name in names {
                         if ui
                             .selectable_label(self.current_theme == Some(name), name)
                             .clicked()
                         {
                             self.current_theme = Some(name);
-                            changed = true;
+                            self.apply_theme(ui, name);
                         }
                     }
                 });
             });
+    }
 
-        if changed {
-            button.mark_changed();
-        }
-        button
+    fn apply_theme(&self, ui: &egui::Ui, name: &str) {
+        self.themes
+            .get(name)
+            .or_else(|| {
+                eprintln!("Could not retrieve theme for key {name}");
+                None
+            })
+            .unwrap()
+            .apply(ui.ctx());
     }
 
     /// Toolbar button: just toggles the window.
@@ -1510,22 +1651,20 @@ impl MarkdownApp {
 
                 // --- Controls ---------------------------------------------
                 ui.horizontal(|ui| {
-                    ui.label("Main theme:");
-                    // self.theme_picker(ui, &THEME_MAP); // your existing Base16 popup method
-                    if self.theme_picker(ui, &THEME_MAP).changed()
-                        && let Some(theme) = &self.current_theme
-                    {
-                        // self.pending_theme = Some(self.themes[self.current_theme].clone());
-                        THEME_MAP
-                            .get(theme)
-                            .or_else(|| {
-                                eprintln!("Could not retrieve theme for key {theme}");
-                                None
-                            })
-                            .unwrap()
-                            .apply(ui.ctx());
-                    } else {
-                        // apply_style(ui.ctx(), true);
+                    ui.horizontal(|ui| {
+                        ui.label("Main theme:");
+                        self.theme_picker(ui);
+                        if ui
+                            .button("📂 Load…")
+                            .on_hover_text("Load a Base16 YAML theme")
+                            .clicked()
+                            && let Some(name) = self.load_base16_file()
+                        {
+                            self.apply_theme(ui, name);
+                        }
+                    });
+                    if let Some(err) = &self.base16_load_error {
+                        ui.colored_label(ui.visuals().error_fg_color, err);
                     }
                 });
 
@@ -1593,6 +1732,49 @@ impl MarkdownApp {
             });
 
         self.theme_window_open = open;
+    }
+
+    /// Blocking native file dialog (rfd), then parse, insert and select.
+    fn load_base16_file(&mut self) -> Option<&'static str> {
+        let Some(path) = rfd::FileDialog::new()
+            .set_title("Load Base16 theme")
+            .add_filter("Base16 YAML", &["yaml", "yml"])
+            .pick_file()
+        else {
+            return None; // cancelled
+        };
+
+        let stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("custom");
+        let result = std::fs::read_to_string(&path)
+            .map_err(|e| e.to_string())
+            .and_then(|src| parse_base16_yaml(&src, stem));
+
+        match result {
+            Ok(mut theme) => {
+                // Don't silently replace an existing theme of the same name.
+                if self.themes.contains_key(theme.name) {
+                    theme.name = Box::leak(format!("{} (file)", theme.name).into_boxed_str());
+                }
+                let name = theme.name;
+
+                // Make sure the new theme is actually visible in the list.
+                if !self.base16_filter.allows(theme.is_dark) {
+                    self.base16_filter = Base16Filter::All;
+                }
+
+                self.themes.insert(name, theme);
+                self.current_theme = Some(name);
+                self.base16_load_error = None;
+                Some(name)
+            }
+            Err(e) => {
+                self.base16_load_error = Some(format!("{}: {e}", path.display()));
+                None
+            }
+        }
     }
 }
 

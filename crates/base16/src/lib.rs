@@ -2,7 +2,7 @@ use eframe::egui;
 use egui::{Color32, Stroke, Visuals};
 use std::{error::Error, fs, path::Path};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Base16 {
     pub name: &'static str,
     pub is_dark: bool,
@@ -141,8 +141,8 @@ fn parse_hex(s: &str) -> Result<Color32, Box<dyn Error>> {
 }
 
 fn luminance(c: Color32) -> f32 {
-    0.0722f32.mul_add(
+    0.0722_f32.mul_add(
         f32::from(c.b()),
-        0.7152f32.mul_add(f32::from(c.g()), 0.2126 * f32::from(c.r())),
+        0.7152_f32.mul_add(f32::from(c.g()), 0.2126 * f32::from(c.r())),
     ) / 255.0
 }
