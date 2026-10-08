@@ -1,0 +1,7 @@
+# Logging settings
+[theming]
+default_theme = "atelier-seaside-light"
+default_tm_theme_dark = "Spectacular"
+default_tm_theme_light = "Solarized (light)"
+# base16_dir = "/path/to/base16/dir"
+# tm_theme_dir = "/path/to/tm_theme/dir"

@@ -1,0 +1,10 @@
+%YAML 1.2
+---
+name: Plain Text Fallback
+file_extensions: []
+
+scope: invalid
+contexts:
+  main:
+    - match: .
+      scope: invalid

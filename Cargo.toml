@@ -41,6 +41,9 @@ path = "src/main.rs"
 
 [dependencies]
 base16 = { path = "crates/base16" }
+dirs = "7"
+documented = "0.10"
+edit = "0.1"
 eframe = { version = "0.36", features = ["wgpu"] }
 ego-tree = "0.11.0"
 # NOTE: a git dependency prevents publishing to crates.io. Switch to a crates.io
@@ -51,6 +54,7 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png"]
 fontdb = { version = "0.23", features = ["fs"] }
 log = "0.4"
 macros = { path = "crates/macros" }
+mockall = "0.15"
 notify = "8"
 phf = { version = "0.14", features = ["macros"] }
 pulldown-cmark = "0.13"
@@ -58,11 +62,24 @@ resvg = { version = "0.45", features = ["text"] }
 rfd = "0.15"
 rust-i18n = "4"
 scraper = "0.27.0"
+serde = "1"
 serde_yaml = "0.9"
+strum = "0.28"
 # Pinned to ensure it won't pull a newer fancy-regex without us changing ours below:
 syntect = { version = "=5.3.0", default-features = false, features = ["default-fancy"] }
 sys-locale = "0.3"
 thag_common = "1"
+thiserror = "2"
+toml = "1"
+toml_edit = "0.25"
+
+# EXPERIMENT (branch `html-opt-in`): build against the local fork, which has the
+# `inline_html` feature. Cargo checks feature names even when they are not enabled,
+# so this must stay while `native-inline-html` exists.
+# DO NOT MERGE OR PUBLISH with this section: it needs ../egui_commonmark.
+# [patch."https://github.com/lampsitter/egui_commonmark"]
+# egui_commonmark = { path = "../egui_commonmark/egui_commonmark" }
+# egui_commonmark_backend = { path = "../egui_commonmark/egui_commonmark_backend" }
 
 # Keep dev builds fast enough to be usable for a GUI app.
 [profile.dev]

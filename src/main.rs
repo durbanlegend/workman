@@ -23,6 +23,8 @@ use std::{
 };
 use syntect::highlighting::{Color, ThemeSet};
 use thag_common::{auto_help, help_system::check_help_and_exit};
+use workman::config::{self /*, Config*/};
+
 /// A fast lightweight multi-lingual GUI markdown viewer.
 ///
 /// Relative links are resolved relative to the parent directory of the
@@ -97,9 +99,9 @@ preload_base16_themes! {}
 // Preload Syntect themes from the `assets/sublime_themes` directory into a static HashMap `SYNTECT_THEME_MAP`.
 preload_syntect_themes! {}
 
-const SYNTAX_STR: &[(&str, &str)] = syntax_str!("PowerShell", "TOML_Syntax_Highlighting");
+const SYNTAX_STR: &[(&str, &str)] = syntax_str!("PowerShell", "TOML");
 const DEFAULT_SYNTECT_THEME_DARK: &str = "Dunkel_Theme";
-const DEFAULT_SYNTECT_THEME_LIGHT: &str = "Eiffel";
+const DEFAULT_SYNTECT_THEME_LIGHT: &str = "Slush_and_Poppies";
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
 enum Base16Filter {
@@ -994,21 +996,58 @@ fn main() -> eframe::Result<()> {
         .unwrap()
         .push(monospace_font.to_owned());
 
-    // let path = "assets/themes/atelier_seaside_light.yaml";
+    // let path = "assets/themes/atelier-seaside-light.yaml";
     // eprintln!("CARGO_MANIFEST_DIR={}", env!("CARGO_MANIFEST_DIR"));
     // let path = "assets/themes/gruvbox-light-soft.yaml";
-    // let path = "assets/themes/black-metal-bathory.yaml";
     // let path = "assets/themes/catppuccin-mocha.yaml";
     // let path = format!("{CARGO_MANIFEST_DIR}/{path}");
     // let theme = Base16::from_file(&path).unwrap_or_else(|e| {
     //     eprintln!("failed to load {path}: {e}");
     //     std::process::exit(1);
     // });
-    let key = "gruvbox-light-hard";
-    let theme = THEME_MAP.get(key);
-    if theme.is_none() {
-        eprintln!("Error retrieving theme {key} from preloaded theme map");
-    }
+    // let key = "gruvbox-light-hard";
+    let config = config::maybe_config();
+    // eprintln!("config={config:?}");
+    eprintln!("config.theming={:?}", config.as_ref().unwrap().theming);
+    // let theming = config.unwrap().theming;
+    // eprintln!(
+    //     "default_theme={:?}, default_tm_theme={:?}",
+    //     theming.default_theme, theming.default_tm_theme
+    // );
+    let config_default_theme =
+        config::maybe_config().and_then(|config| config.theming.default_theme);
+    let (maybe_theme_name, maybe_base16): (Option<&'static str>, Option<&Base16>) =
+        if let Some(default_theme) = config_default_theme {
+            let maybe_base16 = THEME_MAP.get(&default_theme);
+            if maybe_base16.is_some() {
+                (
+                    Some(Box::leak(default_theme.into_boxed_str())),
+                    maybe_base16,
+                )
+            } else {
+                eprintln!("Error retrieving theme {default_theme} from preloaded theme map");
+                (None, None)
+            }
+        } else {
+            (None, None)
+        };
+
+    let config_default_tm_theme_dark =
+        config::maybe_config().and_then(|config| config.theming.default_tm_theme_dark);
+    let tm_theme_dark: Option<&str> =
+        if let Some(default_tm_theme_dark) = config_default_tm_theme_dark {
+            Some(Box::leak(default_tm_theme_dark.into_boxed_str()))
+        } else {
+            Some(DEFAULT_SYNTECT_THEME_DARK)
+        };
+    let config_default_tm_theme_light =
+        config::maybe_config().and_then(|config| config.theming.default_tm_theme_light);
+    let tm_theme_light: Option<&str> =
+        if let Some(default_tm_theme_light) = config_default_tm_theme_light {
+            Some(Box::leak(default_tm_theme_light.into_boxed_str()))
+        } else {
+            Some(DEFAULT_SYNTECT_THEME_LIGHT)
+        };
 
     eframe::run_native(
         "Markdown Viewer",
@@ -1023,7 +1062,7 @@ fn main() -> eframe::Result<()> {
             cc.egui_ctx
                 .add_image_loader(Arc::new(fast_svg_loader::FastSvgLoader::new()));
             apply_style(&cc.egui_ctx, true);
-            if let Some(base16) = theme {
+            if let Some(base16) = maybe_base16 {
                 base16.apply(&cc.egui_ctx);
             } else {
                 let () = &cc.egui_ctx.set_theme(egui::ThemePreference::System);
@@ -1036,6 +1075,11 @@ fn main() -> eframe::Result<()> {
                 toc,
                 cc.egui_ctx.clone(),
                 search_collapsible,
+                maybe_theme_name,
+                tm_theme_dark,
+                tm_theme_light,
+                // config::maybe_config(),
+                maybe_theme_name,
             )))
         }),
     )
@@ -1116,6 +1160,8 @@ struct MarkdownApp {
     sample_cache: CommonMarkCache, // must know the syntect themes, as for your main cache
     base16_filter: Base16Filter,   // Default => All
     base16_load_error: Option<String>,
+    // config: Option<Config>,
+    config_theme: Option<&'static str>,
 }
 
 impl MarkdownApp {
@@ -1126,8 +1172,14 @@ impl MarkdownApp {
         toc: Vec<TocEntry>,
         ctx: egui::Context,
         search_collapsible: bool,
+        current_theme: Option<&'static str>,
+        syntect_theme_dark: Option<&'static str>,
+        syntect_theme_light: Option<&'static str>,
+        // config: Option<Config>,
+        config_theme: Option<&'static str>,
     ) -> Self {
         let content_len = &content.len();
+
         let mut app = Self {
             content,
             raw_content,
@@ -1159,14 +1211,16 @@ impl MarkdownApp {
                 .entries()
                 .map(|(&k, v)| (k, v.clone())) // Clones the value, keeps the &'static str key
                 .collect(),
-            current_theme: None,
-            syntect_theme_dark: Some(DEFAULT_SYNTECT_THEME_DARK),
-            syntect_theme_light: Some(DEFAULT_SYNTECT_THEME_LIGHT),
+            current_theme,
+            syntect_theme_dark,
+            syntect_theme_light,
             theme_window_open: false,
             syntect_filter: ThemeFilter::All,
             sample_cache: CommonMarkCache::default(),
             base16_filter: Base16Filter::All,
             base16_load_error: None,
+            // config,
+            config_theme,
         };
         // eprintln!("CWD={}", std::env::current_dir().unwrap().display());
         add_code_block_themes(&mut app.cache);
@@ -1590,6 +1644,17 @@ impl MarkdownApp {
                     {
                         self.current_theme = None;
                     }
+                    // let maybe_config_theme =
+                    //     self.config.and_then(|config| config.theming.default_theme);
+                    // let checked = maybe_config_theme.is_some();
+                    if let Some(config_theme) = self.config_theme
+                        && ui
+                            .selectable_label(true, format!("(config: {config_theme})"))
+                            .clicked()
+                    {
+                        self.current_theme = self.config_theme;
+                    }
+
                     for name in names {
                         if ui
                             .selectable_label(self.current_theme == Some(name), name)
