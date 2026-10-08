@@ -1001,29 +1001,21 @@ fn main() -> eframe::Result<()> {
     let config_default_theme = config
         .as_ref()
         .and_then(|config| config.theming.default_theme.clone());
-    let (maybe_theme_name, maybe_base16): (Option<&'static str>, Option<&Base16>) =
+    let (maybe_theme_name, maybe_base16_built_in): (Option<&'static str>, Option<&Base16>) =
         config_default_theme.map_or((None, None), |default_theme| {
-            let maybe_base16 = THEME_MAP.get(&default_theme);
-            let leak = Box::leak(default_theme.clone().into_boxed_str());
-            if maybe_base16.is_some() {
-                (Some(leak), maybe_base16)
+            let maybe_base16_built_in = THEME_MAP.get(&default_theme);
+            let built_in_name = Box::leak(default_theme.clone().into_boxed_str());
+            if maybe_base16_built_in.is_some() {
+                (Some(built_in_name), maybe_base16_built_in)
             } else {
                 // eprintln!("Error retrieving theme {default_theme} from preloaded theme map");
-                (Some(leak), None)
+                (Some(built_in_name), None)
             }
         });
-    let maybe_base_16_loaded: Option<Base16> = if maybe_base16.is_none()
+    let maybe_base_16_loaded: Option<Base16> = if maybe_base16_built_in.is_none()
         && let Some(theme_name) = maybe_theme_name
     {
         retrieve_config_theme(config.as_ref(), theme_name)
-    } else {
-        None
-    };
-
-    let maybe_base16: Option<&Base16> = if maybe_base16.is_some() {
-        maybe_base16
-    } else if maybe_base_16_loaded.is_some() {
-        maybe_base_16_loaded.as_ref()
     } else {
         None
     };
@@ -1084,7 +1076,10 @@ fn main() -> eframe::Result<()> {
             cc.egui_ctx
                 .add_image_loader(Arc::new(fast_svg_loader::FastSvgLoader::new()));
             apply_style(&cc.egui_ctx, true);
-            if let Some(base16) = maybe_base16 {
+
+            if let Some(base16) = maybe_base16_built_in {
+                base16.apply(&cc.egui_ctx);
+            } else if let Some(ref base16) = maybe_base_16_loaded {
                 base16.apply(&cc.egui_ctx);
             } else {
                 let () = &cc.egui_ctx.set_theme(egui::ThemePreference::System);
@@ -1098,11 +1093,12 @@ fn main() -> eframe::Result<()> {
                 cc.egui_ctx.clone(),
                 search_collapsible,
                 maybe_theme_name,
+                maybe_base_16_loaded,
                 Some(tm_dark_name),
                 tm_theme_dark_content,
                 tm_theme_light,
                 // config::maybe_config(),
-                maybe_theme_name,
+                // maybe_theme_name,
             )))
         }),
     )
@@ -1210,7 +1206,7 @@ struct MarkdownApp {
     base16_filter: Base16Filter,   // Default => All
     base16_load_error: Option<String>,
     // config: Option<Config>,
-    config_theme: Option<&'static str>,
+    // config_theme: Option<&'static str>,
 }
 
 impl MarkdownApp {
@@ -1223,15 +1219,16 @@ impl MarkdownApp {
         ctx: egui::Context,
         search_collapsible: bool,
         current_theme: Option<&'static str>,
+        maybe_base16_loaded: Option<Base16>,
         syntect_theme_dark: Option<&'static str>,
         maybe_theme_dark_content: Option<String>,
         syntect_theme_light: Option<&'static str>,
-        // config: Option<Config>,
-        config_theme: Option<&'static str>,
+        // config_theme: Option<&'static str>,
     ) -> Self {
         let content_len = &content.len();
 
         let mut cache = CommonMarkCache::default();
+
         let syntect_theme_dark: Option<&'static str> = maybe_theme_dark_content.map_or(
             Some(DEFAULT_SYNTECT_THEME_DARK),
             |dark_theme_content| {
@@ -1274,10 +1271,7 @@ impl MarkdownApp {
             use_viewport_cache: content_len >= &VIEWPORT_CACHE_THRESHOLD,
             html: HtmlRenderer::new(path_to_file_uri(path)),
             search_collapsible,
-            themes: THEME_MAP
-                .entries()
-                .map(|(&k, v)| (k, v.clone())) // Clones the value, keeps the &'static str key
-                .collect(),
+            themes: HashMap::default(),
             current_theme,
             syntect_theme_dark,
             syntect_theme_light,
@@ -1287,9 +1281,13 @@ impl MarkdownApp {
             base16_filter: Base16Filter::All,
             base16_load_error: None,
             // config,
-            config_theme,
+            // config_theme,
         };
         // eprintln!("CWD={}", std::env::current_dir().unwrap().display());
+        if let Some(base_16_loaded) = maybe_base16_loaded {
+            app.add_to_loaded_themes(base_16_loaded);
+        }
+
         add_code_block_themes(&mut app.cache);
         add_code_block_themes(&mut app.sample_cache);
         app.start_watching();
@@ -1696,9 +1694,9 @@ impl MarkdownApp {
                 ui.separator();
 
                 // Built after the radios so a filter change applies this frame.
-                let mut names: Vec<&'static str> = self
-                    .themes
-                    .iter()
+                let mut names: Vec<&'static str> = THEME_MAP
+                    .into_iter()
+                    .chain(self.themes.iter())
                     .filter(|(_, t)| self.base16_filter.allows(t.is_dark))
                     .map(|(&k, _)| k)
                     .collect();
@@ -1710,16 +1708,6 @@ impl MarkdownApp {
                         .clicked()
                     {
                         self.current_theme = None;
-                    }
-                    // let maybe_config_theme =
-                    //     self.config.and_then(|config| config.theming.default_theme);
-                    // let checked = maybe_config_theme.is_some();
-                    if let Some(config_theme) = self.config_theme
-                        && ui
-                            .selectable_label(true, format!("(config: {config_theme})"))
-                            .clicked()
-                    {
-                        self.current_theme = self.config_theme;
                     }
 
                     for name in names {
@@ -1736,11 +1724,13 @@ impl MarkdownApp {
     }
 
     fn apply_theme(&self, ui: &egui::Ui, name: &str) {
-        self.themes
+        THEME_MAP
             .get(name)
             .or_else(|| {
-                eprintln!("Could not retrieve theme for key {name}");
-                None
+                self.themes.get(name).or_else(|| {
+                    eprintln!("Could not retrieve theme for key {name}");
+                    None
+                })
             })
             .unwrap()
             .apply(ui.ctx());
@@ -1885,28 +1875,31 @@ impl MarkdownApp {
             .and_then(|src| parse_base16_yaml(&src, stem));
 
         match result {
-            Ok(mut theme) => {
-                // Don't silently replace an existing theme of the same name.
-                if self.themes.contains_key(theme.name) {
-                    theme.name = Box::leak(format!("{} (file)", theme.name).into_boxed_str());
-                }
-                let name = theme.name;
-
-                // Make sure the new theme is actually visible in the list.
-                if !self.base16_filter.allows(theme.is_dark) {
-                    self.base16_filter = Base16Filter::All;
-                }
-
-                self.themes.insert(name, theme);
-                self.current_theme = Some(name);
-                self.base16_load_error = None;
-                Some(name)
-            }
+            Ok(theme) => Some(self.add_to_loaded_themes(theme)),
             Err(e) => {
                 self.base16_load_error = Some(format!("{}: {e}", path.display()));
                 None
             }
         }
+    }
+
+    fn add_to_loaded_themes(&mut self, mut theme: Base16) -> &'static str {
+        // Don't silently replace an existing theme of the same name.
+        if self.themes.contains_key(theme.name) {
+            theme.name = Box::leak(format!("{} (file)", theme.name).into_boxed_str());
+        }
+        let name = theme.name;
+
+        // Make sure the new theme is actually visible in the list.
+        if !self.base16_filter.allows(theme.is_dark) {
+            self.base16_filter = Base16Filter::All;
+        }
+
+        self.themes.insert(name, theme);
+        eprintln!("Inserted {name}");
+        self.current_theme = Some(name);
+        self.base16_load_error = None;
+        name
     }
 }
 
