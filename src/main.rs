@@ -1015,29 +1015,7 @@ fn main() -> eframe::Result<()> {
     let maybe_base_16_loaded: Option<Base16> = if maybe_base16.is_none()
         && let Some(theme_name) = maybe_theme_name
     {
-        // Retrieve from config directory if any
-        let maybe_base16_dir = config.and_then(|config| config.theming.base16_dir);
-        maybe_base16_dir.and_then(|base16_dir| {
-            let path = PathBuf::from(base16_dir.clone()).join(theme_name.to_owned() + ".yaml");
-            let path = if path.exists() {
-                path
-            } else {
-                PathBuf::from(base16_dir).join(theme_name.to_owned() + ".yml")
-            };
-            if path.exists() {
-                let maybe_theme = Base16::from_file(&path);
-                match maybe_theme {
-                    Ok(ref _theme) => maybe_theme.ok(),
-                    Err(e) => {
-                        eprintln!("failed to load {}: {e}", path.display());
-                        None
-                    }
-                }
-            } else {
-                eprintln!("Path {} (and .yaml) not found", path.display());
-                None
-            }
-        })
+        retrieve_config_theme(config.as_ref(), theme_name)
     } else {
         None
     };
@@ -1052,10 +1030,40 @@ fn main() -> eframe::Result<()> {
 
     let config_default_tm_theme_dark =
         config::maybe_config().and_then(|config| config.theming.default_tm_theme_dark);
-    let tm_theme_dark: Option<&str> = config_default_tm_theme_dark
-        .map_or(Some(DEFAULT_SYNTECT_THEME_DARK), |default_tm_theme_dark| {
-            Some(Box::leak(default_tm_theme_dark.into_boxed_str()))
+    let (tm_theme_dark_name, tm_theme_dark_content): (Option<String>, Option<String>) =
+        config_default_tm_theme_dark.map_or((None, None), |tm_dark_name| {
+            let maybe_tm_theme_dir = config.and_then(|config| config.theming.tm_theme_dir);
+            if let Some(tm_theme_dir) = maybe_tm_theme_dir {
+                let path = PathBuf::from(tm_theme_dir).join(tm_dark_name.clone() + ".tmTheme");
+                if path.exists() {
+                    let maybe_theme = std::fs::read_to_string(&path);
+                    match maybe_theme {
+                        Ok(ref _theme) => (Some(tm_dark_name), maybe_theme.ok()),
+                        Err(e) => {
+                            eprintln!("failed to load {}: {e}", path.display());
+                            (Some(tm_dark_name), None)
+                        }
+                    }
+                } else {
+                    eprintln!("Path {} not found", path.display());
+                    (Some(tm_dark_name), None)
+                }
+            } else {
+                (Some(tm_dark_name), None)
+            }
         });
+    let tm_dark_name = match (tm_theme_dark_name, &tm_theme_dark_content) {
+        (None, _) => DEFAULT_SYNTECT_THEME_DARK,
+        (Some(tm_dark_name), None) => {
+            // No directory configured => prebuilt or default
+            if SYNTECT_THEME_MAP.contains_key(&tm_dark_name) {
+                Box::leak(tm_dark_name.into_boxed_str())
+            } else {
+                DEFAULT_SYNTECT_THEME_DARK
+            }
+        }
+        (Some(tm_dark_name), Some(_)) => Box::leak(tm_dark_name.into_boxed_str()),
+    };
     let config_default_tm_theme_light =
         config::maybe_config().and_then(|config| config.theming.default_tm_theme_light);
     let tm_theme_light: Option<&str> = config_default_tm_theme_light.map_or(
@@ -1090,13 +1098,40 @@ fn main() -> eframe::Result<()> {
                 cc.egui_ctx.clone(),
                 search_collapsible,
                 maybe_theme_name,
-                tm_theme_dark,
+                Some(tm_dark_name),
+                tm_theme_dark_content,
                 tm_theme_light,
                 // config::maybe_config(),
                 maybe_theme_name,
             )))
         }),
     )
+}
+
+// Retrieve from config directory if any
+fn retrieve_config_theme(config: Option<&config::Config>, theme_name: &str) -> Option<Base16> {
+    let maybe_base16_dir = config.and_then(|config| config.theming.base16_dir.as_ref());
+    maybe_base16_dir.and_then(|base16_dir| {
+        let path = PathBuf::from(base16_dir.clone()).join(theme_name.to_owned() + ".yaml");
+        let path = if path.exists() {
+            path
+        } else {
+            PathBuf::from(base16_dir).join(theme_name.to_owned() + ".yml")
+        };
+        if path.exists() {
+            let maybe_theme = Base16::from_file(&path);
+            match maybe_theme {
+                Ok(ref _theme) => maybe_theme.ok(),
+                Err(e) => {
+                    eprintln!("failed to load {}: {e}", path.display());
+                    None
+                }
+            }
+        } else {
+            eprintln!("Path {} (and .yaml) not found", path.display());
+            None
+        }
+    })
 }
 
 /// Pending navigation action triggered by the toolbar buttons.
@@ -1189,17 +1224,34 @@ impl MarkdownApp {
         search_collapsible: bool,
         current_theme: Option<&'static str>,
         syntect_theme_dark: Option<&'static str>,
+        maybe_theme_dark_content: Option<String>,
         syntect_theme_light: Option<&'static str>,
         // config: Option<Config>,
         config_theme: Option<&'static str>,
     ) -> Self {
         let content_len = &content.len();
 
+        let mut cache = CommonMarkCache::default();
+        let syntect_theme_dark: Option<&'static str> = maybe_theme_dark_content.map_or(
+            Some(DEFAULT_SYNTECT_THEME_DARK),
+            |dark_theme_content| {
+                let dark_theme_name = syntect_theme_dark.unwrap();
+                let add_syntax_theme_from_bytes = cache
+                    .add_syntax_theme_from_bytes(dark_theme_name, dark_theme_content.as_bytes());
+                match add_syntax_theme_from_bytes {
+                    Ok(()) => syntect_theme_dark,
+                    Err(e) => {
+                        eprintln!("failed to add syntax theme `{dark_theme_name}` from bytes: {e}");
+                        Some(DEFAULT_SYNTECT_THEME_DARK)
+                    }
+                }
+            },
+        );
         let mut app = Self {
             content,
             raw_content,
             current_file_path: path.to_path_buf(),
-            cache: CommonMarkCache::default(),
+            cache,
             history: if path.is_file() {
                 vec![path.to_path_buf()]
             } else {

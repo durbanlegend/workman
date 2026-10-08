@@ -27,7 +27,7 @@ pub fn preload_syntect_themes_impl(_input: TokenStream) -> TokenStream {
         let theme = path.file_stem().unwrap().to_string_lossy().to_string();
 
         // let mut path = PathBuf::from_str(CARGO_MANIFEST_DIR).unwrap().push("/assets/sublime_themes/").push(theme_name);
-        let theme_str = &std::fs::read_to_string(&path).unwrap_or_else(|e| {
+        let theme_str = std::fs::read_to_string(&path).unwrap_or_else(|e| {
             eprintln!("failed to load {}: {e}", path.display());
             std::process::exit(1);
         });
