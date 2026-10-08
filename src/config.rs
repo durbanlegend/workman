@@ -34,12 +34,18 @@ pub struct Config {
 #[derive(Clone, Debug, Default, Deserialize, Serialize, Documented, DocumentedFields)]
 #[serde(default)]
 pub struct Theming {
-    /// An optional default `base16` (`.yaml`) theme to use for the viewer and markdown document
+    /// An optional default `base16` (`.yaml|.yml`) theme to use for the viewer and markdown document.
+    /// This must be a built-in theme or reside directly under the directory specified by `base16_dir`.
     pub default_theme: Option<String>,
+    /// An optional directory containing the specified  `default_theme` if not built in
+    pub base16_dir: Option<String>,
     /// An optional default `TextMate` theme to use for dark-mode `syntect` code block highlighting
     pub default_tm_theme_dark: Option<String>,
     /// An optional default `TextMate` theme to use for light-mode `syntect` code block highlighting
     pub default_tm_theme_light: Option<String>,
+    /// An optional directory containing the specified  `default_tm_theme_dark` and/or
+    /// `default_tm_theme_light` if not built in
+    pub tm_theme_dir: Option<String>,
 }
 
 /// Result type alias for config operations
@@ -73,7 +79,8 @@ impl Config {
 
         #[cfg(debug_assertions)]
         eprintln!(
-            "1. config_path={config_path:#?}, exists={}",
+            "1. config_path={}, exists={}",
+            config_path.display(),
             config_path.exists()
         );
 
@@ -92,7 +99,8 @@ impl Config {
 
                 #[cfg(debug_assertions)]
                 eprintln!(
-                    "2. dist_config={user_config:#?}, exists={}",
+                    "2. dist_config={}, exists={}",
+                    config_path.display(),
                     user_config.exists()
                 );
                 if user_config.exists() {
@@ -112,7 +120,8 @@ impl Config {
 
         #[cfg(debug_assertions)]
         eprintln!(
-            "4. config_path={config_path:#?}, exists={}",
+            "4. config_path={}, exists={}",
+            config_path.display(),
             config_path.exists()
         );
         // let config_str = fs::read_to_string(&config_path)?;
@@ -146,7 +155,8 @@ impl Config {
         }
     }
 
-    fn validate(&self) -> ConfigResult<()> {
+    #[expect(clippy::unnecessary_wraps, clippy::unused_self)]
+    const fn validate(&self) -> ConfigResult<()> {
         // Add validation as needed
         Ok(())
     }
@@ -286,7 +296,7 @@ pub fn get_context() -> Arc<dyn Context> {
 pub fn load(context: &Arc<dyn Context>) -> ConfigResult<Option<Config>> {
     let config_path = context.get_config_path();
 
-    eprintln!("config_path={config_path:?}");
+    eprintln!("config_path={}", config_path.display());
 
     if !config_path.exists() {
         println!(
@@ -311,7 +321,7 @@ pub fn load(context: &Arc<dyn Context>) -> ConfigResult<Option<Config>> {
 #[allow(clippy::unnecessary_wraps)]
 pub fn open(context: &dyn Context) -> ConfigResult<Option<String>> {
     let config_path = context.get_config_path();
-    eprintln!("config_path={config_path:?}");
+    eprintln!("config_path={}", config_path.display());
 
     let exists = config_path.exists();
     if !exists {

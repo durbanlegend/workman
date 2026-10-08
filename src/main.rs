@@ -101,7 +101,7 @@ preload_syntect_themes! {}
 
 const SYNTAX_STR: &[(&str, &str)] = syntax_str!("PowerShell", "TOML");
 const DEFAULT_SYNTECT_THEME_DARK: &str = "Dunkel_Theme";
-const DEFAULT_SYNTECT_THEME_LIGHT: &str = "Slush_and_Poppies";
+const DEFAULT_SYNTECT_THEME_LIGHT: &str = "Active4D";
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
 enum Base16Filter {
@@ -996,58 +996,72 @@ fn main() -> eframe::Result<()> {
         .unwrap()
         .push(monospace_font.to_owned());
 
-    // let path = "assets/themes/atelier-seaside-light.yaml";
-    // eprintln!("CARGO_MANIFEST_DIR={}", env!("CARGO_MANIFEST_DIR"));
-    // let path = "assets/themes/gruvbox-light-soft.yaml";
-    // let path = "assets/themes/catppuccin-mocha.yaml";
-    // let path = format!("{CARGO_MANIFEST_DIR}/{path}");
-    // let theme = Base16::from_file(&path).unwrap_or_else(|e| {
-    //     eprintln!("failed to load {path}: {e}");
-    //     std::process::exit(1);
-    // });
-    // let key = "gruvbox-light-hard";
     let config = config::maybe_config();
-    // eprintln!("config={config:?}");
-    eprintln!("config.theming={:?}", config.as_ref().unwrap().theming);
-    // let theming = config.unwrap().theming;
-    // eprintln!(
-    //     "default_theme={:?}, default_tm_theme={:?}",
-    //     theming.default_theme, theming.default_tm_theme
-    // );
-    let config_default_theme =
-        config::maybe_config().and_then(|config| config.theming.default_theme);
+    // eprintln!("config.theming={:#?}", config.as_ref().unwrap().theming);
+    let config_default_theme = config
+        .as_ref()
+        .and_then(|config| config.theming.default_theme.clone());
     let (maybe_theme_name, maybe_base16): (Option<&'static str>, Option<&Base16>) =
-        if let Some(default_theme) = config_default_theme {
+        config_default_theme.map_or((None, None), |default_theme| {
             let maybe_base16 = THEME_MAP.get(&default_theme);
+            let leak = Box::leak(default_theme.clone().into_boxed_str());
             if maybe_base16.is_some() {
-                (
-                    Some(Box::leak(default_theme.into_boxed_str())),
-                    maybe_base16,
-                )
+                (Some(leak), maybe_base16)
             } else {
-                eprintln!("Error retrieving theme {default_theme} from preloaded theme map");
-                (None, None)
+                // eprintln!("Error retrieving theme {default_theme} from preloaded theme map");
+                (Some(leak), None)
             }
-        } else {
-            (None, None)
-        };
+        });
+    let maybe_base_16_loaded: Option<Base16> = if maybe_base16.is_none()
+        && let Some(theme_name) = maybe_theme_name
+    {
+        // Retrieve from config directory if any
+        let maybe_base16_dir = config.and_then(|config| config.theming.base16_dir);
+        maybe_base16_dir.and_then(|base16_dir| {
+            let path = PathBuf::from(base16_dir.clone()).join(theme_name.to_owned() + ".yaml");
+            let path = if path.exists() {
+                path
+            } else {
+                PathBuf::from(base16_dir).join(theme_name.to_owned() + ".yml")
+            };
+            if path.exists() {
+                let maybe_theme = Base16::from_file(&path);
+                match maybe_theme {
+                    Ok(ref _theme) => maybe_theme.ok(),
+                    Err(e) => {
+                        eprintln!("failed to load {}: {e}", path.display());
+                        None
+                    }
+                }
+            } else {
+                eprintln!("Path {} (and .yaml) not found", path.display());
+                None
+            }
+        })
+    } else {
+        None
+    };
+
+    let maybe_base16: Option<&Base16> = if maybe_base16.is_some() {
+        maybe_base16
+    } else if maybe_base_16_loaded.is_some() {
+        maybe_base_16_loaded.as_ref()
+    } else {
+        None
+    };
 
     let config_default_tm_theme_dark =
         config::maybe_config().and_then(|config| config.theming.default_tm_theme_dark);
-    let tm_theme_dark: Option<&str> =
-        if let Some(default_tm_theme_dark) = config_default_tm_theme_dark {
+    let tm_theme_dark: Option<&str> = config_default_tm_theme_dark
+        .map_or(Some(DEFAULT_SYNTECT_THEME_DARK), |default_tm_theme_dark| {
             Some(Box::leak(default_tm_theme_dark.into_boxed_str()))
-        } else {
-            Some(DEFAULT_SYNTECT_THEME_DARK)
-        };
+        });
     let config_default_tm_theme_light =
         config::maybe_config().and_then(|config| config.theming.default_tm_theme_light);
-    let tm_theme_light: Option<&str> =
-        if let Some(default_tm_theme_light) = config_default_tm_theme_light {
-            Some(Box::leak(default_tm_theme_light.into_boxed_str()))
-        } else {
-            Some(DEFAULT_SYNTECT_THEME_LIGHT)
-        };
+    let tm_theme_light: Option<&str> = config_default_tm_theme_light.map_or(
+        Some(DEFAULT_SYNTECT_THEME_LIGHT),
+        |default_tm_theme_light| Some(Box::leak(default_tm_theme_light.into_boxed_str())),
+    );
 
     eframe::run_native(
         "Markdown Viewer",
@@ -1165,6 +1179,7 @@ struct MarkdownApp {
 }
 
 impl MarkdownApp {
+    #[expect(clippy::too_many_arguments)]
     fn new(
         content: String,
         raw_content: String,
