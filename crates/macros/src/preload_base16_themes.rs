@@ -60,8 +60,11 @@ pub fn preload_base16_themes_impl(_input: TokenStream) -> TokenStream {
     // eprintln!("Done!");
 
     quote! {
-        /// A static HashMap mapping theme names to preloaded themes
-        static THEME_MAP: phf::Map<&'static str, Base16> = phf::phf_map! {
+        /// A static Map that maps theme names from `.yaml` `Base16` files to the
+        /// `Base16` content that we use for theming the documents.
+        /// (Note that this does not apply to code blocks, which are higlighted by
+        /// `egui_commonmark` using `TextMate` themes stored in a separate map.)
+        static B16_THEME_MAP: phf::Map<&'static str, Base16> = phf::phf_map! {
                 #(#theme_mappings),*
             };
     }

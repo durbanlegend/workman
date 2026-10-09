@@ -93,10 +93,10 @@ macro_rules! syntax_str {
     };
 }
 
-// Preload Base16 themes from the `assets/themes` directory into a static HashMap `THEME_MAP`.
+// Preload Base16 themes from the `assets/themes` directory into a static HashMap `B16_THEME_MAP`.
 preload_base16_themes! {}
 
-// Preload Syntect themes from the `assets/sublime_themes` directory into a static HashMap `SYNTECT_THEME_MAP`.
+// Preload Syntect themes from the `assets/sublime_themes` directory into a static HashMap `TM_THEME_MAP`.
 preload_syntect_themes! {}
 
 const SYNTAX_STR: &[(&str, &str)] = syntax_str!("PowerShell", "TOML");
@@ -256,14 +256,14 @@ No language, so no highlighting.
 // Light/dark classification of the bundled .tmTheme files (computed once)
 // ---------------------------------------------------------------------------
 
-/// `(theme name, is_dark)` for every theme in `SYNTECT_THEME_MAP`, sorted by name.
+/// `(theme name, is_dark)` for every theme in `TM_THEME_MAP`, sorted by name.
 /// "Dark" means the theme's background colour has a luminance below 50%.
 /// A theme with no background setting is treated as light; one that fails to
 /// parse is skipped.
-fn syntect_themes() -> &'static [(&'static str, bool)] {
+fn tm_themes() -> &'static [(&'static str, bool)] {
     static THEMES: OnceLock<Vec<(&'static str, bool)>> = OnceLock::new();
     THEMES.get_or_init(|| {
-        let mut v: Vec<_> = SYNTECT_THEME_MAP
+        let mut v: Vec<_> = TM_THEME_MAP
             .entries()
             .filter_map(|(&name, &src)| {
                 let theme = ThemeSet::load_from_reader(&mut Cursor::new(src)).ok()?;
@@ -285,8 +285,8 @@ fn is_dark(theme: &syntect::highlighting::Theme) -> bool {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
-enum ThemeFilter {
-    /// Only syntect themes matching the current light/dark mode.
+enum TmThemeFilter {
+    /// Only `syntect` `TextMate` themes matching the current light/dark mode.
     #[default]
     Matching,
     All,
@@ -1007,7 +1007,7 @@ fn main() -> eframe::Result<()> {
         .and_then(|config| config.theming.default_theme.clone());
     let (maybe_theme_name, maybe_base16_built_in): (Option<&'static str>, Option<&Base16>) =
         config_default_theme.map_or((None, None), |default_theme| {
-            let maybe_base16_built_in = THEME_MAP.get(&default_theme);
+            let maybe_base16_built_in = B16_THEME_MAP.get(&default_theme);
             let built_in_name = Box::leak(default_theme.clone().into_boxed_str());
             if maybe_base16_built_in.is_some() {
                 (Some(built_in_name), maybe_base16_built_in)
@@ -1036,7 +1036,7 @@ fn main() -> eframe::Result<()> {
             (None, _) => dark_or_light_theme(true),
             (Some(tm_theme_name), None) => {
                 // No directory configured => prebuilt or default
-                if SYNTECT_THEME_MAP.contains_key(&tm_theme_name) {
+                if TM_THEME_MAP.contains_key(&tm_theme_name) {
                     Box::leak(tm_theme_name.into_boxed_str())
                 } else {
                     dark_or_light_theme(true)
@@ -1059,7 +1059,7 @@ fn main() -> eframe::Result<()> {
             (None, _) => dark_or_light_theme(false),
             (Some(tm_theme_name), None) => {
                 // No directory configured => prebuilt or default
-                if SYNTECT_THEME_MAP.contains_key(&tm_theme_name) {
+                if TM_THEME_MAP.contains_key(&tm_theme_name) {
                     Box::leak(tm_theme_name.into_boxed_str())
                 } else {
                     dark_or_light_theme(false)
@@ -1199,9 +1199,9 @@ enum NavAction {
 struct ThemeConfig {
     current_theme: Option<&'static str>,
     maybe_base16_loaded: Option<Base16>,
-    syntect_theme_dark: Option<&'static str>,
+    tm_theme_dark: Option<&'static str>,
     maybe_theme_dark_content: Option<String>,
-    syntect_theme_light: Option<&'static str>,
+    tm_theme_light: Option<&'static str>,
     maybe_theme_light_content: Option<String>,
 }
 
@@ -1209,17 +1209,17 @@ impl ThemeConfig {
     const fn new(
         current_theme: Option<&'static str>,
         maybe_base16_loaded: Option<Base16>,
-        syntect_theme_dark: Option<&'static str>,
+        tm_theme_dark: Option<&'static str>,
         maybe_theme_dark_content: Option<String>,
-        syntect_theme_light: Option<&'static str>,
+        tm_theme_light: Option<&'static str>,
         maybe_theme_light_content: Option<String>,
     ) -> Self {
         Self {
             current_theme,
             maybe_base16_loaded,
-            syntect_theme_dark,
+            tm_theme_dark,
             maybe_theme_dark_content,
-            syntect_theme_light,
+            tm_theme_light,
             maybe_theme_light_content,
         }
     }
@@ -1278,19 +1278,21 @@ struct MarkdownApp {
     html: HtmlRenderer,
     /// Whether to expand disclosure widgets to expose them to the `egui_commonmark` search facility.
     search_collapsible: bool,
-    /// The collection of available themes
+    /// The collection of available `Base16` themes loaded at runtime to supplement the built-in
+    /// themes loaded at compile time into `B16_THEME_MAP`
     themes: HashMap<&'static str, Base16>,
     /// The current `Base16` markdown theme, if overriding `egui` defaults.
     current_theme: Option<&'static str>,
-    /// The collection of available `syntect` themes
-    syntect_themes: HashMap<&'static str, String>,
-    /// The current `syntect` theme for code block highlighting in dark mode, if overriding the app default.
-    syntect_theme_dark: Option<&'static str>,
-    /// The current `syntect` theme for code block highlighting in light mode, if overriding the app default.
-    syntect_theme_light: Option<&'static str>,
+    /// The collection of `syntect` `TextMate` themes loaded at runtime to supplement the built-in
+    /// themes loaded at compile time into `TM_THEME_MAP`
+    tm_themes: HashMap<&'static str, String>,
+    /// The current `syntect` `TextMate` theme for code block highlighting in dark mode, if overriding the app default.
+    tm_theme_dark: Option<&'static str>,
+    /// The current `syntect` `TextMate` theme for code block highlighting in light mode, if overriding the app default.
+    tm_theme_light: Option<&'static str>,
     theme_window_open: bool,
-    syntect_filter: ThemeFilter,
-    sample_cache: CommonMarkCache, // must know the syntect themes, as for your main cache
+    tm_theme_filter: TmThemeFilter,
+    sample_cache: CommonMarkCache, // must know the `syntect` themes, as for the main cache
     base16_filter: Base16Filter,   // Default => All
     base16_load_error: Option<String>,
     tm_load_error: Option<String>,
@@ -1314,26 +1316,26 @@ impl MarkdownApp {
 
         let mut cache = CommonMarkCache::default();
 
-        let syntect_theme_dark: Option<&'static str> = add_syntect_theme(
+        let tm_theme_dark: Option<&'static str> = add_tm_theme(
             &mut cache,
             true,
-            theme_config.syntect_theme_dark,
+            theme_config.tm_theme_dark,
             theme_config.maybe_theme_dark_content.clone(),
         );
-        // cache.theme_dark = theme_config.syntect_theme_dark;
+        // cache.theme_dark = theme_config.tm_theme_dark;
 
         eprintln!(
-            // "0. In MarkdownApp:new(): theme_config.syntect_theme_light={:?}",
-            theme_config.syntect_theme_light
+            // "0. In MarkdownApp:new(): theme_config.tm_theme_light={:?}",
+            // theme_config.tm_theme_light
         );
-        let syntect_theme_light: Option<&'static str> = add_syntect_theme(
+        let tm_theme_light: Option<&'static str> = add_tm_theme(
             &mut cache,
             false,
-            theme_config.syntect_theme_light,
+            theme_config.tm_theme_light,
             theme_config.maybe_theme_light_content.clone(),
         );
-        // eprintln!("1. In MarkdownApp:new(): syntect_theme_light={syntect_theme_light:?}");
-        // cache.theme_light = theme_config.syntect_theme_light;
+        // eprintln!("1. In MarkdownApp:new(): tm_theme_light={tm_theme_light:?}");
+        // cache.theme_light = theme_config.tm_theme_light;
 
         let dark_mode = ctx.theme() == egui::Theme::Dark;
 
@@ -1366,11 +1368,11 @@ impl MarkdownApp {
             search_collapsible,
             themes: HashMap::default(),
             current_theme: theme_config.current_theme,
-            syntect_themes: HashMap::default(),
-            syntect_theme_dark,
-            syntect_theme_light,
+            tm_themes: HashMap::default(),
+            tm_theme_dark,
+            tm_theme_light,
             theme_window_open: false,
-            syntect_filter: ThemeFilter::All,
+            tm_theme_filter: TmThemeFilter::All,
             sample_cache: CommonMarkCache::default(),
             base16_filter: Base16Filter::All,
             base16_load_error: None,
@@ -1383,62 +1385,58 @@ impl MarkdownApp {
             app.add_to_loaded_themes(base_16_loaded);
         }
 
-        let syntect_theme_dark = theme_config.syntect_theme_dark.unwrap();
+        let tm_theme_dark = theme_config.tm_theme_dark.unwrap();
         if let Some(theme_dark_content) = theme_config.maybe_theme_dark_content
-            && !SYNTECT_THEME_MAP.contains_key(syntect_theme_dark)
+            && !TM_THEME_MAP.contains_key(tm_theme_dark)
         {
-            app.add_to_loaded_tm_themes(dark_mode, syntect_theme_dark, theme_dark_content.clone());
+            app.add_to_loaded_tm_themes(dark_mode, tm_theme_dark, theme_dark_content.clone());
             match app
                 .cache
-                .add_syntax_theme_from_bytes(syntect_theme_dark, theme_dark_content.as_bytes())
+                .add_syntax_theme_from_bytes(tm_theme_dark, theme_dark_content.as_bytes())
             {
-                Ok(()) => eprintln!("Added syntax theme from bytes with name {syntect_theme_dark}"),
-                Err(_) => eprintln!(
-                    "Failed to add syntax theme from bytes with name {syntect_theme_dark}"
-                ),
+                Ok(()) => eprintln!("Added syntax theme from bytes with name {tm_theme_dark}"),
+                Err(_) => {
+                    eprintln!("Failed to add syntax theme from bytes with name {tm_theme_dark}");
+                }
             }
 
             match app
                 .sample_cache
-                .add_syntax_theme_from_bytes(syntect_theme_dark, theme_dark_content.as_bytes())
+                .add_syntax_theme_from_bytes(tm_theme_dark, theme_dark_content.as_bytes())
             {
-                Ok(()) => eprintln!("Added syntax theme from bytes with name {syntect_theme_dark}"),
-                Err(_) => eprintln!(
-                    "Failed to add syntax theme from bytes with name {syntect_theme_dark}"
-                ),
+                Ok(()) => eprintln!("Added syntax theme from bytes with name {tm_theme_dark}"),
+                Err(_) => {
+                    eprintln!("Failed to add syntax theme from bytes with name {tm_theme_dark}");
+                }
             }
         }
 
-        let syntect_theme_light = theme_config.syntect_theme_light.unwrap();
-        // eprintln!("2. In MarkdownApp:new(): syntect_theme_light={syntect_theme_light:?}");
+        let tm_theme_light = theme_config.tm_theme_light.unwrap();
+        // eprintln!("2. In MarkdownApp:new(): tm_theme_light={tm_theme_light:?}");
         if let Some(theme_light_content) = theme_config.maybe_theme_light_content
-            && !SYNTECT_THEME_MAP.contains_key(syntect_theme_light)
+            && !TM_THEME_MAP.contains_key(tm_theme_light)
         {
-            app.add_to_loaded_tm_themes(
-                dark_mode,
-                syntect_theme_light,
-                theme_light_content.clone(),
-            );
+            app.add_to_loaded_tm_themes(dark_mode, tm_theme_light, theme_light_content.clone());
             match app
                 .cache
-                .add_syntax_theme_from_bytes(syntect_theme_light, theme_light_content.as_bytes())
+                .add_syntax_theme_from_bytes(tm_theme_light, theme_light_content.as_bytes())
             {
                 Ok(()) => {
-                    eprintln!("Added syntax theme from bytes with name {syntect_theme_light}");
+                    eprintln!("Added syntax theme from bytes with name {tm_theme_light}");
                 }
-                Err(_) => eprintln!(
-                    "Failed to add syntax theme from bytes with name {syntect_theme_light}"
-                ),
+                Err(_) => {
+                    eprintln!("Failed to add syntax theme from bytes with name {tm_theme_light}");
+                }
             }
             match app
                 .sample_cache
-                .add_syntax_theme_from_bytes(syntect_theme_light, theme_light_content.as_bytes())
+                .add_syntax_theme_from_bytes(tm_theme_light, theme_light_content.as_bytes())
             {
                 Ok(()) => {
-                    eprintln!("Added syntax theme from bytes with name {syntect_theme_light}");
+                    eprintln!("Added syntax theme from bytes with name {tm_theme_light}");
                 }
                 Err(e) => eprintln!(
-                    "Error {e} attempting to add syntax theme from bytes with name {syntect_theme_light}"
+                    "Error {e} attempting to add syntax theme from bytes with name {tm_theme_light}"
                 ),
             }
         }
@@ -1849,7 +1847,7 @@ impl MarkdownApp {
                 ui.separator();
 
                 // Built after the radios so a filter change applies this frame.
-                let mut names: Vec<&'static str> = THEME_MAP
+                let mut names: Vec<&'static str> = B16_THEME_MAP
                     .into_iter()
                     .chain(self.themes.iter())
                     .filter(|(_, t)| self.base16_filter.allows(t.is_dark))
@@ -1857,22 +1855,25 @@ impl MarkdownApp {
                     .collect();
                 names.sort_unstable();
 
-                ScrollArea::vertical().max_height(300.0).show(ui, |ui| {
-                    for name in names {
-                        if ui
-                            .selectable_label(self.current_theme == Some(name), name)
-                            .clicked()
-                        {
-                            self.current_theme = Some(name);
-                            self.apply_theme(ui, name);
+                ScrollArea::vertical()
+                    .id_salt("theme_picker")
+                    .max_height(300.0)
+                    .show(ui, |ui| {
+                        for name in names {
+                            if ui
+                                .selectable_label(self.current_theme == Some(name), name)
+                                .clicked()
+                            {
+                                self.current_theme = Some(name);
+                                self.apply_theme(ui, name);
+                            }
                         }
-                    }
-                });
+                    });
             });
     }
 
     fn apply_theme(&self, ui: &egui::Ui, name: &str) {
-        THEME_MAP
+        B16_THEME_MAP
             .get(name)
             .or_else(|| {
                 self.themes.get(name).or_else(|| {
@@ -1944,42 +1945,35 @@ impl MarkdownApp {
                         ui.label("Code themes:");
                         let which = if dark { "dark" } else { "light" };
                         ui.radio_value(
-                            &mut self.syntect_filter,
-                            ThemeFilter::Matching,
+                            &mut self.tm_theme_filter,
+                            TmThemeFilter::Matching,
                             format!("Only {which}"),
                         );
-                        ui.radio_value(&mut self.syntect_filter, ThemeFilter::All, "All");
+                        ui.radio_value(&mut self.tm_theme_filter, TmThemeFilter::All, "All");
                     });
                     if let Some(err) = &self.tm_load_error {
                         ui.colored_label(ui.visuals().error_fg_color, err);
                     }
                 });
 
-                let all = self.syntect_filter == ThemeFilter::All;
+                let all = self.tm_theme_filter == TmThemeFilter::All;
 
                 // Computed before `slot` mutably borrows fields of `self`.
-                let added = self.added_syntect_themes();
+                let added = self.added_tm_themes();
 
-                // The slot being edited depends on the current light/dark mode.
+                // The "slot" here is a mutable reference to the current TM theme field
+                // for the current light or dark mode, which will thus be assigned the
+                // theme value selected from the default label or combo box. Selecting the
+                // "default" entry at the top will set it to `None`, causing it to fall back
+                // to the `const` default when we invoke the `CommonMarkViewer`'s
+                // `syntax_theme_dark` or `syntax_theme_light` builder (as the case may
+                // be) with the `const` value as fallback.
                 let (slot, default) = if dark {
-                    (
-                        &mut self.syntect_theme_dark,
-                        config::maybe_config()
-                            .and_then(|config| config.theming.default_tm_theme_dark)
-                            .unwrap_or_else(|| DEFAULT_SYNTECT_THEME_DARK.to_string()),
-                    )
+                    (&mut self.tm_theme_dark, DEFAULT_SYNTECT_THEME_DARK)
                 } else {
-                    (
-                        &mut self.syntect_theme_light,
-                        config::maybe_config()
-                            .and_then(|config| config.theming.default_tm_theme_light)
-                            .unwrap_or_else(|| DEFAULT_SYNTECT_THEME_LIGHT.to_string()),
-                    )
+                    (&mut self.tm_theme_light, DEFAULT_SYNTECT_THEME_LIGHT)
                 };
-                // eprintln!(
-                //     "dark={dark}, slot={slot:?}, default=={default}, config.theming.default_tm_theme_light={:?}",
-                //     config::maybe_config().and_then(|config| config.theming.default_tm_theme_light)
-                // );
+                // eprintln!("dark={dark}, slot={slot:?}, default=={default}");
 
                 ui.horizontal(|ui| {
                     ui.label(if dark {
@@ -1992,10 +1986,11 @@ impl MarkdownApp {
                         .close_behavior(PopupCloseBehavior::CloseOnClickOutside)
                         .height(300.0)
                         .show_ui(ui, |ui| {
+                            // Assigns `self.tm_theme_[dark/light}` to `None`, triggering th default
                             ui.selectable_value(slot, None, format!("(default: {default})"));
                             for &(name, is_dark) in added
                                 .iter()
-                                .chain(syntect_themes().iter().filter(|(_, d)| all || *d == dark))
+                                .chain(tm_themes().iter().filter(|(_, d)| all || *d == dark))
                             {
                                 let label = if all {
                                     format!("{} {name}", if is_dark { "🌙" } else { "☀" })
@@ -2011,16 +2006,15 @@ impl MarkdownApp {
 
                 // --- Sample markdown --------------------------------------
                 ScrollArea::vertical()
+                    .id_salt("sample markdown")
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
                         CommonMarkViewer::new()
                             .syntax_theme_dark(
-                                self.syntect_theme_dark
-                                    .unwrap_or(DEFAULT_SYNTECT_THEME_DARK),
+                                self.tm_theme_dark.unwrap_or(DEFAULT_SYNTECT_THEME_DARK),
                             )
                             .syntax_theme_light(
-                                self.syntect_theme_light
-                                    .unwrap_or(DEFAULT_SYNTECT_THEME_LIGHT),
+                                self.tm_theme_light.unwrap_or(DEFAULT_SYNTECT_THEME_LIGHT),
                             )
                             .show(ui, &mut self.sample_cache, SAMPLE_MD);
                     });
@@ -2058,7 +2052,7 @@ impl MarkdownApp {
 
     fn add_to_loaded_themes(&mut self, mut theme: Base16) -> &'static str {
         // Don't silently replace an existing theme of the same name.
-        if THEME_MAP.contains_key(theme.name) || self.themes.contains_key(theme.name) {
+        if B16_THEME_MAP.contains_key(theme.name) || self.themes.contains_key(theme.name) {
             theme.name = Box::leak(format!("{} (file)", theme.name).into_boxed_str());
         }
         let name = theme.name;
@@ -2092,36 +2086,36 @@ impl MarkdownApp {
 
         // Don't silently replace an existing theme of the same name.
         let theme_name = tm_theme.name.as_deref().unwrap_or(tm_theme_name);
-        let name = if SYNTECT_THEME_MAP.contains_key(theme_name)
-            || self.syntect_themes.contains_key(theme_name)
-        {
-            // Box::leak(÷format!("{theme_name} (file)").into_boxed_str())
-            format!("{theme_name} (file)")
-        } else {
-            theme_name.to_string()
-        };
+        let name =
+            if TM_THEME_MAP.contains_key(theme_name) || self.tm_themes.contains_key(theme_name) {
+                // Box::leak(÷format!("{theme_name} (file)").into_boxed_str())
+                format!("{theme_name} (file)")
+            } else {
+                theme_name.to_string()
+            };
         let name = Box::leak(name.into_boxed_str());
 
         let is_dark = is_dark(&tm_theme);
 
         // Make sure the new theme is actually visible in the list.
-        if self.syntect_filter == ThemeFilter::Matching && is_dark != dark_mode {
-            self.syntect_filter = ThemeFilter::All;
+        if self.tm_theme_filter == TmThemeFilter::Matching && is_dark != dark_mode {
+            self.tm_theme_filter = TmThemeFilter::All;
         }
 
-        self.syntect_themes.insert(name, tm_theme_content);
+        self.tm_themes.insert(name, tm_theme_content);
         eprintln!("Inserted TM theme {name}");
         self.tm_load_error = None;
         Some(name)
     }
 
-    /// `(theme name, is_dark)` for every theme in `SYNTECT_THEME_MAP`, sorted by name.
+    /// `(theme name, is_dark)` for every theme in `self.tm_themes`, sorted by name.
+    /// These are loaded at runtime, currently only by the configuration mechanism.
     /// "Dark" means the theme's background colour has a luminance below 50%.
     /// A theme with no background setting is treated as light; one that fails to
     /// parse is skipped.
-    fn added_syntect_themes(&self) -> Vec<(&'static str, bool)> {
+    fn added_tm_themes(&self) -> Vec<(&'static str, bool)> {
         let mut v: Vec<_> = self
-            .syntect_themes
+            .tm_themes
             .iter()
             .filter_map(|(&name, src)| {
                 let theme = ThemeSet::load_from_reader(&mut Cursor::new(src)).ok()?;
@@ -2141,19 +2135,19 @@ const fn dark_or_light_theme(is_dark: bool) -> &'static str {
     }
 }
 
-fn add_syntect_theme<'a>(
+fn add_tm_theme<'a>(
     cache: &mut CommonMarkCache,
     is_dark: bool,
-    syntect_theme: Option<&'a str>,
+    tm_theme: Option<&'a str>,
     maybe_theme_content: Option<String>,
 ) -> Option<&'a str> {
     maybe_theme_content.map_or_else(
         || Some(dark_or_light_theme(is_dark)),
         |theme_content| {
-            let theme_name = syntect_theme.unwrap();
+            let theme_name = tm_theme.unwrap();
             let result = cache.add_syntax_theme_from_bytes(theme_name, theme_content.as_bytes());
             match result {
-                Ok(()) => syntect_theme,
+                Ok(()) => tm_theme,
                 Err(e) => {
                     eprintln!("failed to add syntax theme `{theme_name}` from bytes: {e}");
                     Some(dark_or_light_theme(is_dark))
@@ -2170,7 +2164,7 @@ fn add_code_block_themes(cache: &mut CommonMarkCache) {
             eprintln!("failed to load {name}: {e}");
         }
     }
-    for (theme, plist_content) in &SYNTECT_THEME_MAP {
+    for (theme, plist_content) in &TM_THEME_MAP {
         cache
             .add_syntax_theme_from_bytes(*theme, plist_content.as_bytes())
             .unwrap();
@@ -2903,14 +2897,8 @@ impl eframe::App for MarkdownApp {
             // (cheap, Rc-backed) clone rather than borrow `self.html`.
             let html = self.html.clone();
             CommonMarkViewer::new()
-                .syntax_theme_dark(
-                    self.syntect_theme_dark
-                        .unwrap_or(DEFAULT_SYNTECT_THEME_DARK),
-                )
-                .syntax_theme_light(
-                    self.syntect_theme_light
-                        .unwrap_or(DEFAULT_SYNTECT_THEME_LIGHT),
-                )
+                .syntax_theme_dark(self.tm_theme_dark.unwrap_or(DEFAULT_SYNTECT_THEME_DARK))
+                .syntax_theme_light(self.tm_theme_light.unwrap_or(DEFAULT_SYNTECT_THEME_LIGHT))
                 .search_match_color(match_bg)
                 .search_active_match_color(active_bg)
                 .enable_scroll_to_heading(true)
@@ -3050,7 +3038,7 @@ impl eframe::App for MarkdownApp {
                 .open(&mut open)
                 .show(ui, |ui| {
                     customise_scrollbar(ui);
-                    egui::ScrollArea::vertical().show(ui, |ui| {
+                    egui::ScrollArea::vertical().id_salt("help").show(ui, |ui| {
                         let help_text =
                             t!("help.text", prev = "\u{276e}", next = "\u{276f}").to_string();
                         CommonMarkViewer::new().show(ui, &mut self.help_cache, &help_text);

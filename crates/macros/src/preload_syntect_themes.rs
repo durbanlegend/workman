@@ -41,8 +41,9 @@ pub fn preload_syntect_themes_impl(_input: TokenStream) -> TokenStream {
     }
 
     quote! {
-        /// A static HashMap mapping theme names to preloaded themes
-        static SYNTECT_THEME_MAP: phf::Map<&'static str, &'static str> = phf::phf_map! {
+        /// A static HashMap mapping TextMate theme names to preloaded themes
+        /// for `egui_commonmark` to highlight code blocks using `syntect`
+        static TM_THEME_MAP: phf::Map<&'static str, &'static str> = phf::phf_map! {
                 #(#theme_mappings),*
             };
     }

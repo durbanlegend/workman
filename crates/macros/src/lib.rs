@@ -25,7 +25,8 @@ pub fn preload_base16_themes(input: TokenStream) -> TokenStream {
     )
 }
 
-/// Preload visual themes for code block highlighting into memory at compile time.
+/// Preload `TextMate` visual themes into memory at compile time for use by
+/// `egui_commonmark` and `syntect` for code block highlighring..
 ///
 /// Syntax:
 ///
