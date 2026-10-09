@@ -1224,7 +1224,7 @@ dependencies = [
 [[package]]
 name = "egui_commonmark"
 version = "0.25.0"
-source = "git+https://github.com/lampsitter/egui_commonmark#04d0c6d6a0c32778f4e4802ff3757eedf828d20a"
+source = "git+https://github.com/lampsitter/egui_commonmark?rev=f3fce134#f3fce134b1fdd2a31cd887cd3656248e731c6a11"
 dependencies = [
  "egui",
  "egui_commonmark_backend",
@@ -1235,7 +1235,7 @@ dependencies = [
 [[package]]
 name = "egui_commonmark_backend"
 version = "0.25.0"
-source = "git+https://github.com/lampsitter/egui_commonmark#04d0c6d6a0c32778f4e4802ff3757eedf828d20a"
+source = "git+https://github.com/lampsitter/egui_commonmark?rev=f3fce134#f3fce134b1fdd2a31cd887cd3656248e731c6a11"
 dependencies = [
  "bitflags 2.13.2",
  "egui",

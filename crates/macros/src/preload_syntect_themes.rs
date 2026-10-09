@@ -24,10 +24,10 @@ pub fn preload_syntect_themes_impl(_input: TokenStream) -> TokenStream {
             continue;
         }
 
-        let theme = path.file_stem().unwrap().to_string_lossy().to_string();
+        let theme_name = path.file_stem().unwrap().to_string_lossy().to_string();
 
         // let mut path = PathBuf::from_str(CARGO_MANIFEST_DIR).unwrap().push("/assets/sublime_themes/").push(theme_name);
-        let theme_str = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+        let theme_content_str = std::fs::read_to_string(&path).unwrap_or_else(|e| {
             eprintln!("failed to load {}: {e}", path.display());
             std::process::exit(1);
         });
@@ -35,7 +35,7 @@ pub fn preload_syntect_themes_impl(_input: TokenStream) -> TokenStream {
         // let theme_bytes = theme_str.as_bytes();
 
         let theme_mapping = quote! {
-            #theme => #theme_str
+            #theme_name => #theme_content_str
         };
         theme_mappings.push(theme_mapping);
     }

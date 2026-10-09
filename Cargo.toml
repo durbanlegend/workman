@@ -48,7 +48,7 @@ eframe = { version = "0.36", features = ["wgpu"] }
 ego-tree = "0.11.0"
 # NOTE: a git dependency prevents publishing to crates.io. Switch to a crates.io
 # release of egui_commonmark once it contains the required changes.
-egui_commonmark = { git = "https://github.com/lampsitter/egui_commonmark", features = ["better_syntax_highlighting", "svg", "fetch"] }
+egui_commonmark = { git = "https://github.com/lampsitter/egui_commonmark", rev = "f3fce134", features = ["better_syntax_highlighting", "svg", "fetch"] }
 egui_extras = { version = "0.36", features = ["svg", "syntect"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 fontdb = { version = "0.23", features = ["fs"] }
