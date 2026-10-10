@@ -270,7 +270,8 @@ fn tm_themes() -> &'static [(&'static str, bool)] {
                 Some((name, is_dark(&theme)))
             })
             .collect();
-        v.sort_unstable_by_key(|(name, _)| *name);
+        // v.sort_unstable_by_key(|(name, _)| *name);
+        v.sort_unstable_by(|a, b| a.0.to_ascii_lowercase().cmp(&b.0.to_ascii_lowercase()));
         v
     })
 }
@@ -1320,7 +1321,7 @@ impl MarkdownApp {
             &mut cache,
             true,
             theme_config.tm_theme_dark,
-            theme_config.maybe_theme_dark_content.clone(),
+            theme_config.maybe_theme_dark_content.as_ref(),
         );
         // cache.theme_dark = theme_config.tm_theme_dark;
 
@@ -1332,7 +1333,7 @@ impl MarkdownApp {
             &mut cache,
             false,
             theme_config.tm_theme_light,
-            theme_config.maybe_theme_light_content.clone(),
+            theme_config.maybe_theme_light_content.as_ref(),
         );
         // eprintln!("1. In MarkdownApp:new(): tm_theme_light={tm_theme_light:?}");
         // cache.theme_light = theme_config.tm_theme_light;
@@ -1881,8 +1882,7 @@ impl MarkdownApp {
                     None
                 })
             })
-            .unwrap()
-            .apply(ui.ctx());
+            .and_then(|theme| Some(theme.apply(ui.ctx())));
     }
 
     /// Toolbar button: just toggles the window.
@@ -1919,38 +1919,47 @@ impl MarkdownApp {
             // Start near the top-right so the main document stays visible; still draggable.
             .default_pos(ctx.content_rect().right_top() + egui::vec2(-440.0, 8.0))
             .show(ctx, |ui| {
-                let dark = ui.visuals().dark_mode;
+                let dark_mode = ui.visuals().dark_mode;
 
                 // --- Controls ---------------------------------------------
                 ui.horizontal(|ui| {
-                    ui.horizontal(|ui| {
-                        ui.label("Main theme:");
-                        self.theme_picker(ui);
-                        if ui
-                            .button("📂 Load…")
-                            .on_hover_text("Load a Base16 YAML theme")
-                            .clicked()
-                            && let Some(name) = self.load_base16_file()
-                        {
-                            self.apply_theme(ui, name);
-                        }
-                    });
+                    ui.label("Main theme:");
+                    self.theme_picker(ui);
+                    if ui
+                        .button("📂 Load…")
+                        .on_hover_text("Load a Base16 YAML theme")
+                        .clicked()
+                        && let Some(name) = self.load_base16_file()
+                    {
+                        self.apply_theme(ui, name);
+                    }
                     if let Some(err) = &self.base16_load_error {
                         ui.colored_label(ui.visuals().error_fg_color, err);
                     }
                 });
 
                 ui.horizontal(|ui| {
-                    ui.horizontal(|ui| {
-                        ui.label("Code themes:");
-                        let which = if dark { "dark" } else { "light" };
-                        ui.radio_value(
-                            &mut self.tm_theme_filter,
-                            TmThemeFilter::Matching,
-                            format!("Only {which}"),
-                        );
-                        ui.radio_value(&mut self.tm_theme_filter, TmThemeFilter::All, "All");
-                    });
+                    ui.label("Code themes:");
+                    let which = if dark_mode { "dark" } else { "light" };
+                    ui.radio_value(
+                        &mut self.tm_theme_filter,
+                        TmThemeFilter::Matching,
+                        format!("Only {which}"),
+                    );
+                    ui.radio_value(&mut self.tm_theme_filter, TmThemeFilter::All, "All");
+                    if ui
+                        .button("📂 Load…")
+                        .on_hover_text("Load a code block highlighting theme")
+                        .clicked()
+                    {
+                        let result = self.load_tm_theme_file(dark_mode);
+                        eprintln!("self.load_tm_theme_file({dark_mode})={result:?}");
+                        if dark_mode {
+                            self.tm_theme_dark = result;
+                        } else {
+                            self.tm_theme_light = result;
+                        }
+                    }
                     if let Some(err) = &self.tm_load_error {
                         ui.colored_label(ui.visuals().error_fg_color, err);
                     }
@@ -1968,7 +1977,7 @@ impl MarkdownApp {
                 // to the `const` default when we invoke the `CommonMarkViewer`'s
                 // `syntax_theme_dark` or `syntax_theme_light` builder (as the case may
                 // be) with the `const` value as fallback.
-                let (slot, default) = if dark {
+                let (slot, default) = if dark_mode {
                     (&mut self.tm_theme_dark, DEFAULT_SYNTECT_THEME_DARK)
                 } else {
                     (&mut self.tm_theme_light, DEFAULT_SYNTECT_THEME_LIGHT)
@@ -1976,7 +1985,7 @@ impl MarkdownApp {
                 // eprintln!("dark={dark}, slot={slot:?}, default=={default}");
 
                 ui.horizontal(|ui| {
-                    ui.label(if dark {
+                    ui.label(if dark_mode {
                         "Dark code theme:"
                     } else {
                         "Light code theme:"
@@ -1990,7 +1999,7 @@ impl MarkdownApp {
                             ui.selectable_value(slot, None, format!("(default: {default})"));
                             for &(name, is_dark) in added
                                 .iter()
-                                .chain(tm_themes().iter().filter(|(_, d)| all || *d == dark))
+                                .chain(tm_themes().iter().filter(|(_, d)| all || *d == dark_mode))
                             {
                                 let label = if all {
                                     format!("{} {name}", if is_dark { "🌙" } else { "☀" })
@@ -2069,6 +2078,31 @@ impl MarkdownApp {
         name
     }
 
+    /// Blocking native file dialog (rfd), then parse, insert and select.
+    fn load_tm_theme_file(&mut self, dark_mode: bool) -> Option<&'static str> {
+        let Some(path) = rfd::FileDialog::new()
+            .set_title("Load TM theme")
+            .add_filter("TextMate", &[".tmTheme"])
+            .pick_file()
+        else {
+            return None; // cancelled
+        };
+
+        let stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("custom");
+        let result = std::fs::read_to_string(&path).map_err(|e| e.to_string());
+
+        match result {
+            Ok(theme) => self.add_to_loaded_tm_themes(dark_mode, stem, theme),
+            Err(e) => {
+                self.tm_load_error = Some(format!("{}: {e}", path.display()));
+                None
+            }
+        }
+    }
+
     fn add_to_loaded_tm_themes(
         &mut self,
         dark_mode: bool,
@@ -2097,6 +2131,20 @@ impl MarkdownApp {
 
         let is_dark = is_dark(&tm_theme);
 
+        add_tm_theme(
+            &mut self.cache,
+            is_dark,
+            Some(name),
+            Some(&tm_theme_content),
+        );
+
+        add_tm_theme(
+            &mut self.sample_cache,
+            is_dark,
+            Some(name),
+            Some(&tm_theme_content),
+        );
+
         // Make sure the new theme is actually visible in the list.
         if self.tm_theme_filter == TmThemeFilter::Matching && is_dark != dark_mode {
             self.tm_theme_filter = TmThemeFilter::All;
@@ -2122,7 +2170,8 @@ impl MarkdownApp {
                 Some((name, is_dark(&theme)))
             })
             .collect();
-        v.sort_unstable_by_key(|(name, _)| *name);
+        // v.sort_unstable_by_key(|(name, _)| *name);
+        v.sort_unstable_by(|a, b| a.0.to_ascii_lowercase().cmp(&b.0.to_ascii_lowercase()));
         v
     }
 }
@@ -2139,7 +2188,7 @@ fn add_tm_theme<'a>(
     cache: &mut CommonMarkCache,
     is_dark: bool,
     tm_theme: Option<&'a str>,
-    maybe_theme_content: Option<String>,
+    maybe_theme_content: Option<&String>,
 ) -> Option<&'a str> {
     maybe_theme_content.map_or_else(
         || Some(dark_or_light_theme(is_dark)),
