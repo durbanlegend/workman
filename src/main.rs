@@ -103,6 +103,7 @@ preload_syntect_themes! {}
 const SYNTAX_STR: &[(&str, &str)] = syntax_str!("PowerShell", "TOML");
 const DEFAULT_SYNTECT_THEME_DARK: &str = "Dunkel_Theme";
 const DEFAULT_SYNTECT_THEME_LIGHT: &str = "Active4D";
+const BUILT_IN_THEME_DIR: &str = "assets/themes";
 const BUILT_IN_TM_THEME_DIR: &str = "assets/sublime_themes";
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
@@ -1020,20 +1021,18 @@ fn main() -> eframe::Result<()> {
     let maybe_base_16_loaded: Option<Base16> = if maybe_base16_built_in.is_none()
         && let Some(theme_name) = maybe_theme_name
     {
-        retrieve_config_theme(config.as_ref(), theme_name)
+        retrieve_config_theme(config.as_ref(), theme_name, BUILT_IN_THEME_DIR)
     } else {
         None
     };
 
-    let config_default_tm_theme_dark =
+    let tm_theme_dark_name =
         config::maybe_config().and_then(|config| config.theming.default_tm_theme_dark);
-    let (tm_theme_dark_name, tm_theme_dark_content) = retrieve_config_tm_theme(
-        config.as_ref(),
-        config_default_tm_theme_dark.clone(),
-        BUILT_IN_TM_THEME_DIR,
-    );
+    let tm_theme_dark_content = tm_theme_dark_name.as_ref().and_then(|theme_dark_name| {
+        retrieve_config_tm_theme(config.as_ref(), theme_dark_name, BUILT_IN_TM_THEME_DIR)
+    });
     eprintln!(
-        "config_default_tm_theme_dark={config_default_tm_theme_dark:?}, tm_theme_dark_name={tm_theme_dark_name:?}"
+        "config_default_tm_theme_dark={tm_theme_dark_name:?}, tm_theme_dark_name={tm_theme_dark_name:?}"
     );
     let tm_dark_name = {
         match (tm_theme_dark_name, &tm_theme_dark_content) {
@@ -1050,14 +1049,11 @@ fn main() -> eframe::Result<()> {
         }
     };
 
-    let config_default_tm_theme_light =
+    let tm_theme_light_name =
         config::maybe_config().and_then(|config| config.theming.default_tm_theme_light);
-    let (tm_theme_light_name, tm_theme_light_content) = retrieve_config_tm_theme(
-        config.as_ref(),
-        config_default_tm_theme_light,
-        BUILT_IN_TM_THEME_DIR,
-    );
-    // eprintln!("1. tm_theme_light_name={tm_theme_light_name:?}");
+    let tm_theme_light_content = tm_theme_light_name.as_ref().and_then(|theme_light_name| {
+        retrieve_config_tm_theme(config.as_ref(), theme_light_name, BUILT_IN_TM_THEME_DIR)
+    }); // eprintln!("1. tm_theme_light_name={tm_theme_light_name:?}");
     let tm_light_name = {
         match (tm_theme_light_name, &tm_theme_light_content) {
             (None, _) => dark_or_light_theme(false),
@@ -1120,59 +1116,23 @@ fn main() -> eframe::Result<()> {
     )
 }
 
+// Retrieve from config directory if any
 fn retrieve_config_tm_theme(
     config: Option<&config::Config>,
-    config_default_tm_theme: Option<String>,
+    tm_theme_name: &str,
     built_in_tm_theme_dir: &str,
-) -> (Option<String>, Option<String>) {
-    let (tm_theme_name, tm_theme_content): (Option<String>, Option<String>) =
-        config_default_tm_theme.map_or((None, None), |tm_theme_name| {
-            let maybe_tm_theme_dir = config.and_then(|config| config.theming.tm_theme_dir.as_ref());
-            if let Some(tm_theme_dir) = maybe_tm_theme_dir {
-                let path = PathBuf::from(tm_theme_dir).join(tm_theme_name.clone() + ".tmTheme");
-                if path.exists() {
-                    retrieve_tm_theme(&tm_theme_name, &path)
-                } else {
-                    let path = PathBuf::from(built_in_tm_theme_dir)
-                        .join(tm_theme_name.clone() + ".tmTheme");
-                    if path.exists() {
-                        eprintln!("Retrieving {tm_theme_name} from built-in TM theme directory");
-                        retrieve_tm_theme(&tm_theme_name, &path)
-                    } else {
-                        eprintln!("Path {} not found", path.display());
-                        (Some(tm_theme_name), None)
-                    }
-                }
-            } else {
-                (Some(tm_theme_name), None)
-            }
-        });
-    (tm_theme_name, tm_theme_content)
-}
-
-fn retrieve_tm_theme(tm_theme_name: &str, path: &PathBuf) -> (Option<String>, Option<String>) {
-    let maybe_theme = fs::read_to_string(path);
-    match maybe_theme {
-        Ok(ref _theme) => (Some(tm_theme_name.to_owned()), maybe_theme.ok()),
-        Err(e) => {
-            eprintln!("failed to load {}: {e}", path.display());
-            (Some(tm_theme_name.to_owned()), None)
-        }
-    }
-}
-
-// Retrieve from config directory if any
-fn retrieve_config_theme(config: Option<&config::Config>, theme_name: &str) -> Option<Base16> {
-    let maybe_base16_dir = config.and_then(|config| config.theming.base16_dir.as_ref());
-    maybe_base16_dir.and_then(|base16_dir| {
-        let path = PathBuf::from(base16_dir.clone()).join(theme_name.to_owned() + ".yaml");
+) -> Option<String> {
+    let maybe_tm_theme_dir = config.and_then(|config| config.theming.tm_theme_dir.as_ref());
+    maybe_tm_theme_dir.and_then(|tm_theme_dir| {
+        let path = PathBuf::from(tm_theme_dir).join(String::from(tm_theme_name) + ".tmTheme");
         let path = if path.exists() {
             path
         } else {
-            PathBuf::from(base16_dir).join(theme_name.to_owned() + ".yml")
+            eprintln!("Try retrieving {tm_theme_name} from built-in TM theme directory");
+            PathBuf::from(built_in_tm_theme_dir).join(String::from(tm_theme_name) + ".tmTheme")
         };
         if path.exists() {
-            let maybe_theme = Base16::from_file(&path);
+            let maybe_theme = fs::read_to_string(&path);
             match maybe_theme {
                 Ok(ref _theme) => maybe_theme.ok(),
                 Err(e) => {
@@ -1181,8 +1141,42 @@ fn retrieve_config_theme(config: Option<&config::Config>, theme_name: &str) -> O
                 }
             }
         } else {
-            eprintln!("Path {} (and .yaml) not found", path.display());
+            eprintln!("Path {} not found", path.display());
             None
+        }
+    })
+}
+
+// Retrieve from config directory if any
+fn retrieve_config_theme(
+    config: Option<&config::Config>,
+    theme_name: &str,
+    built_in_theme_dir: &str,
+) -> Option<Base16> {
+    let maybe_base16_dir = config.and_then(|config| config.theming.base16_dir.as_ref());
+    maybe_base16_dir.and_then(|base16_dir| {
+        let mut path: Option<PathBuf> = None;
+        'outer: for &dir in &[base16_dir, built_in_theme_dir] {
+            for ext in &["yaml", "yml"] {
+                let try_path = PathBuf::from(String::from(dir)).join(theme_name.to_owned() + ext);
+                eprintln!("Try {}", try_path.display());
+                if try_path.exists() {
+                    path = Some(try_path);
+                    break 'outer;
+                }
+            }
+        }
+        let Some(path) = path else {
+            eprintln!("No eligible path found for theme {theme_name}");
+            return None;
+        };
+        let maybe_theme = Base16::from_file(&path);
+        match maybe_theme {
+            Ok(ref _theme) => maybe_theme.ok(),
+            Err(e) => {
+                eprintln!("failed to load {}: {e}", path.display());
+                None
+            }
         }
     })
 }
