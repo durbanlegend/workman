@@ -2,7 +2,7 @@
 
 ![The pun only works in English](assets/icon.png)
 
-A fast, lightweight, multi-lingual GUI markdown viewer, built with [egui](https://github.com/emilk/egui).
+A fast, multi-lingual GUI markdown viewer, built with [egui](https://github.com/emilk/egui).
 
 ## Features
 
@@ -14,7 +14,7 @@ A fast, lightweight, multi-lingual GUI markdown viewer, built with [egui](https:
 
 - Large document support.
 
-- Customise the look from the toolbar with built-in, external or default light and dark themes.
+- Personalised theming from the toolbar with built-in, external or default light and dark themes.
 
 - Zoom and font scaling with reset.
 
@@ -104,11 +104,16 @@ On Unix systems, launching from a terminal without the `-f` option automatically
 
 You can tailor the look of _Workman_ quite extensively to suit your taste.
 
-The palette 🎨 button on the toolbar opens a _Themes_ window where you can try out and choose from a gallery of built-in themes, or choose one from an external `base16` or `base24` `.yaml` file that you load yourself. A wide selection is available to browse and download at [tinted-theming](https://github.com/tinted-theming/schemes/blob/spec-0.11/README.md).
+The palette 🎨 button on the toolbar toggles a _Themes_ window where you can try out and choose from a gallery of built-in themes, or choose one from an external `base16` or `base24` `.yaml` file that you load yourself. A wide selection is available to browse and download at [tinted-theming](https://github.com/tinted-theming/schemes/blob/spec-0.11/README.md).
 
-Code blocks in markdown have their own separate highlighting system. From the same window you can try out and choose from a gallery of `syntect` code block highlighting themes to go with your markdown theme, or `TODO` choose one from an external `.tmTheme` file that you load yourself. A wide selection is available to browse and download at [TextMate-Themes](https://inkdeep.github.io/TextMate-Themes).
+Code blocks in markdown have their own separate highlighting system. From the same window you can try out and choose from a gallery of `syntect` code block highlighting themes to go with your markdown theme, or choose one from an external `.tmTheme` file that you load yourself. A wide selection is available to browse and download at [TextMate-Themes](https://inkdeep.github.io/TextMate-Themes).
 
 The `Esc` key is a keyboard shortcut to close the  _Themes_ window.
+
+To make your preferences the default, save the [sample configuration file](https://github.com/durbanlegend/workman/blob/theming/assets/default_config.toml) to the following location and edit it to specify the exact names (file stems) and absolute or relative locations of your preferred themes:
+
+- MacOS/Linux: '$HOME/.config/workman/config.toml'
+- Windows: '$APPDATA/.config/workman/config.toml'
 
 ## License
 

@@ -48,6 +48,25 @@ pub struct Theming {
     pub tm_theme_dir: Option<String>,
 }
 
+impl Theming {
+    #[must_use]
+    pub const fn new(
+        default_theme: Option<String>,
+        base16_dir: Option<String>,
+        default_tm_theme_dark: Option<String>,
+        default_tm_theme_light: Option<String>,
+        tm_theme_dir: Option<String>,
+    ) -> Self {
+        Self {
+            default_theme,
+            base16_dir,
+            default_tm_theme_dark,
+            default_tm_theme_light,
+            tm_theme_dir,
+        }
+    }
+}
+
 /// Result type alias for config operations
 pub type ConfigResult<T> = Result<T, ConfigError>;
 

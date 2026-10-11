@@ -10,6 +10,7 @@ use notify::{RecursiveMode, Watcher};
 use pulldown_cmark::{Event, Options, Parser, Tag};
 use rfd::FileDialog;
 use rust_i18n::t;
+use std::fs::write;
 use std::{
     collections::HashMap,
     env,
@@ -23,7 +24,7 @@ use std::{
 };
 use syntect::highlighting::{Color, ThemeSet};
 use thag_common::{auto_help, help_system::check_help_and_exit};
-use workman::config::{self /*, Config*/};
+use workman::config::{self, Context, RealContext};
 
 /// A fast lightweight multi-lingual GUI markdown viewer.
 ///
@@ -247,8 +248,8 @@ Get-ChildItem -Path . -Recurse |
 ```
 
 ```
-An unannotated code fence.
-No language, so no highlighting.
+A bare code fence (no info string):
+Plain text highlighting.
 ```
 "#;
 
@@ -271,7 +272,7 @@ fn tm_themes() -> &'static [(&'static str, bool)] {
             })
             .collect();
         // v.sort_unstable_by_key(|(name, _)| *name);
-        v.sort_unstable_by(|a, b| a.0.to_ascii_lowercase().cmp(&b.0.to_ascii_lowercase()));
+        v.sort_unstable_by_key(|a| a.0.to_ascii_lowercase());
         v
     })
 }
@@ -1874,20 +1875,23 @@ impl MarkdownApp {
     }
 
     fn apply_theme(&self, ui: &egui::Ui, name: &str) {
-        B16_THEME_MAP
-            .get(name)
-            .or_else(|| {
-                self.themes.get(name).or_else(|| {
-                    eprintln!("Could not retrieve theme for key {name}");
-                    None
-                })
+        if let Some(theme) = B16_THEME_MAP.get(name).or_else(|| {
+            self.themes.get(name).or_else(|| {
+                eprintln!("Could not retrieve theme for key {name}");
+                None
             })
-            .and_then(|theme| Some(theme.apply(ui.ctx())));
+        }) {
+            theme.apply(ui.ctx());
+        }
     }
 
     /// Toolbar button: just toggles the window.
     fn theme_button(&mut self, ui: &mut egui::Ui) {
-        if ui.button("🎨").on_hover_text("Themes…").clicked() {
+        if ui
+            .selectable_label(self.theme_window_open, "🎨")
+            .on_hover_text("Themes…")
+            .clicked()
+        {
             self.theme_window_open = !self.theme_window_open;
         }
     }
@@ -1910,6 +1914,8 @@ impl MarkdownApp {
 
         // `.open()` needs `&mut bool`; use a local to avoid borrowing `self`.
         let mut open = true;
+        let mut base16_path: Option<PathBuf> = None;
+        let mut tm_theme_path: Option<PathBuf> = None;
 
         egui::Window::new("Themes")
             .open(&mut open) // gives the title-bar close button
@@ -1917,6 +1923,7 @@ impl MarkdownApp {
             .resizable(true)
             .default_size([420.0, 500.0])
             // Start near the top-right so the main document stays visible; still draggable.
+            // .default_pos(ctx.content_rect().left_top() + egui::vec2(0.0, 24.0))
             .default_pos(ctx.content_rect().right_top() + egui::vec2(-440.0, 8.0))
             .show(ctx, |ui| {
                 let dark_mode = ui.visuals().dark_mode;
@@ -1927,14 +1934,16 @@ impl MarkdownApp {
                     self.theme_picker(ui);
                     if ui
                         .button("📂 Load…")
-                        .on_hover_text("Load a Base16 YAML theme")
-                        .clicked()
-                        && let Some(name) = self.load_base16_file()
-                    {
-                        self.apply_theme(ui, name);
-                    }
-                    if let Some(err) = &self.base16_load_error {
-                        ui.colored_label(ui.visuals().error_fg_color, err);
+                        .on_hover_text("Load a Base16 YAML theme file")
+                        .clicked() {
+                        let (maybe_base16_path, maybe_name) = self.load_base16_file();
+                        if let Some(name) = maybe_name {
+                                base16_path = maybe_base16_path;
+                                self.apply_theme(ui, name);
+                            }
+                        if let Some(err) = &self.base16_load_error {
+                            ui.colored_label(ui.visuals().error_fg_color, err);
+                        }
                     }
                 });
 
@@ -1949,16 +1958,19 @@ impl MarkdownApp {
                     ui.radio_value(&mut self.tm_theme_filter, TmThemeFilter::All, "All");
                     if ui
                         .button("📂 Load…")
-                        .on_hover_text("Load a code block highlighting theme")
+                        .on_hover_text("Load a .tmTheme file")
                         .clicked()
                     {
-                        let result = self.load_tm_theme_file(dark_mode);
-                        eprintln!("self.load_tm_theme_file({dark_mode})={result:?}");
+                        let (maybe_tm_path, maybe_name) = self.load_tm_theme_file(dark_mode);
+                        eprintln!(
+                            "self.load_tm_theme_file({dark_mode})=({maybe_tm_path:?}, {maybe_name:?})"
+                        );
                         if dark_mode {
-                            self.tm_theme_dark = result;
+                            self.tm_theme_dark = maybe_name;
                         } else {
-                            self.tm_theme_light = result;
+                            self.tm_theme_light = maybe_name;
                         }
+                        tm_theme_path = maybe_tm_path;
                     }
                     if let Some(err) = &self.tm_load_error {
                         ui.colored_label(ui.visuals().error_fg_color, err);
@@ -2011,6 +2023,49 @@ impl MarkdownApp {
                         });
                 });
 
+                let mut save_error: Option<String> = None;
+                ui.horizontal(|ui| {
+                    ui.label("Save as default:");
+                    if ui
+                        .button("Save")
+                        .on_hover_text("Save configuration")
+                        .clicked()
+                    {
+                        match config::maybe_config() {
+                            Some(mut config) => {
+                                config.theming = config::Theming::new(
+                                    self.current_theme.map(String::from),
+                                    config.theming.base16_dir.or_else(|| base16_path.map(|path| path.to_string_lossy().to_string())),
+                                    self.tm_theme_dark.map(String::from),
+                                    self.tm_theme_light.map(String::from),
+                                    config.theming.tm_theme_dir.or_else(|| tm_theme_path.map(|path| path.to_string_lossy().to_string())),
+                                );
+                                let path = RealContext::new().get_config_path();
+                                let result = toml::to_string_pretty(&config);
+                                match result {
+                                    Ok(contents) => match write(path, contents) {
+                                        Ok(()) => (),
+                                        Err(e) => {
+                                            let err = format!("Failed to save configuration: {e}");
+                                            eprintln!("{err}");
+                                            save_error = Some(err);
+                                        },
+                                    },
+                                    Err(e) => {
+                                        let err = format!("Failed to serialise configuration: {e}");
+                                        eprintln!("{err}");
+                                        save_error = Some(err);
+                                    },
+                                }
+                            },
+                            None => eprintln!("Failed to retrieve configuration"),
+                        }
+                    }
+                    if let Some (err) = save_error {
+                        ui.colored_label(ui.visuals().error_fg_color, err);
+                    }
+                });
+
                 ui.separator();
 
                 // --- Sample markdown --------------------------------------
@@ -2033,13 +2088,19 @@ impl MarkdownApp {
     }
 
     /// Blocking native file dialog (rfd), then parse, insert and select.
-    fn load_base16_file(&mut self) -> Option<&'static str> {
+    fn load_base16_file(&mut self) -> (Option<PathBuf>, Option<&'static str>) {
         let Some(path) = rfd::FileDialog::new()
+            .set_directory(
+                config::maybe_config()
+                    .as_ref()
+                    .and_then(|config| config.theming.base16_dir.clone())
+                    .unwrap_or_default(),
+            )
             .set_title("Load Base16 theme")
             .add_filter("Base16 YAML", &["yaml", "yml"])
             .pick_file()
         else {
-            return None; // cancelled
+            return (None, None); // cancelled
         };
 
         let stem = path
@@ -2051,10 +2112,10 @@ impl MarkdownApp {
             .and_then(|src| parse_base16_yaml(&src, stem));
 
         match result {
-            Ok(theme) => Some(self.add_to_loaded_themes(theme)),
+            Ok(theme) => (Some(path), Some(self.add_to_loaded_themes(theme))),
             Err(e) => {
                 self.base16_load_error = Some(format!("{}: {e}", path.display()));
-                None
+                (None, None)
             }
         }
     }
@@ -2079,13 +2140,19 @@ impl MarkdownApp {
     }
 
     /// Blocking native file dialog (rfd), then parse, insert and select.
-    fn load_tm_theme_file(&mut self, dark_mode: bool) -> Option<&'static str> {
+    fn load_tm_theme_file(&mut self, dark_mode: bool) -> (Option<PathBuf>, Option<&'static str>) {
         let Some(path) = rfd::FileDialog::new()
+            .set_directory(
+                config::maybe_config()
+                    .as_ref()
+                    .and_then(|config| config.theming.tm_theme_dir.clone())
+                    .unwrap_or_default(),
+            )
             .set_title("Load TM theme")
             .add_filter("TextMate", &[".tmTheme"])
             .pick_file()
         else {
-            return None; // cancelled
+            return (None, None); // cancelled
         };
 
         let stem = path
@@ -2095,10 +2162,13 @@ impl MarkdownApp {
         let result = std::fs::read_to_string(&path).map_err(|e| e.to_string());
 
         match result {
-            Ok(theme) => self.add_to_loaded_tm_themes(dark_mode, stem, theme),
+            Ok(theme) => (
+                Some(path.clone()),
+                self.add_to_loaded_tm_themes(dark_mode, stem, theme),
+            ),
             Err(e) => {
                 self.tm_load_error = Some(format!("{}: {e}", path.display()));
-                None
+                (None, None)
             }
         }
     }
@@ -2171,7 +2241,7 @@ impl MarkdownApp {
             })
             .collect();
         // v.sort_unstable_by_key(|(name, _)| *name);
-        v.sort_unstable_by(|a, b| a.0.to_ascii_lowercase().cmp(&b.0.to_ascii_lowercase()));
+        v.sort_unstable_by_key(|a| a.0.to_ascii_lowercase());
         v
     }
 }
@@ -2198,7 +2268,7 @@ fn add_tm_theme<'a>(
             match result {
                 Ok(()) => tm_theme,
                 Err(e) => {
-                    eprintln!("failed to add syntax theme `{theme_name}` from bytes: {e}");
+                    eprintln!("Failed to add syntax theme `{theme_name}` from bytes: {e}");
                     Some(dark_or_light_theme(is_dark))
                 }
             }
@@ -2429,7 +2499,9 @@ impl eframe::App for MarkdownApp {
                     }
                 });
 
+                // Palette to toggle themes window
                 self.theme_button(ui);
+
                 ui.separator();
 
                 if ui

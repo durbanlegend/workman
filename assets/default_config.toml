@@ -1,4 +1,4 @@
-# Logging settings
+# Theming settings
 [theming]
 default_theme = "atelier-seaside-light"
 base16_dir = "/path/to/base16/dir"
