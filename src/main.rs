@@ -10,7 +10,7 @@ use notify::{RecursiveMode, Watcher};
 use pulldown_cmark::{Event, Options, Parser, Tag};
 use rfd::FileDialog;
 use rust_i18n::t;
-use std::fs::write;
+use std::fs::{self, write};
 use std::{
     collections::HashMap,
     env,
@@ -906,13 +906,12 @@ fn main() -> eframe::Result<()> {
             // Keep CWD in sync for canonicalize() calls inside the viewer.
             let _ = env::set_current_dir(&initial_base_dir);
 
-            let raw_content =
-                std::fs::read_to_string(&canonical_initial_path).unwrap_or_else(|_| {
-                    format!(
-                        "# Error\nFailed to read `{}`.",
-                        canonical_initial_path.display()
-                    )
-                });
+            let raw_content = fs::read_to_string(&canonical_initial_path).unwrap_or_else(|_| {
+                format!(
+                    "# Error\nFailed to read `{}`.",
+                    canonical_initial_path.display()
+                )
+            });
             let raw_content = if raw_content.len() > MAX_BYTES {
                 let size_mb = raw_content.len() as f64 / 1e6;
                 eprintln!(
@@ -1030,8 +1029,11 @@ fn main() -> eframe::Result<()> {
         config::maybe_config().and_then(|config| config.theming.default_tm_theme_dark);
     let (tm_theme_dark_name, tm_theme_dark_content) = retrieve_config_tm_theme(
         config.as_ref(),
-        config_default_tm_theme_dark,
+        config_default_tm_theme_dark.clone(),
         BUILT_IN_TM_THEME_DIR,
+    );
+    eprintln!(
+        "config_default_tm_theme_dark={config_default_tm_theme_dark:?}, tm_theme_dark_name={tm_theme_dark_name:?}"
     );
     let tm_dark_name = {
         match (tm_theme_dark_name, &tm_theme_dark_content) {
@@ -1129,27 +1131,13 @@ fn retrieve_config_tm_theme(
             if let Some(tm_theme_dir) = maybe_tm_theme_dir {
                 let path = PathBuf::from(tm_theme_dir).join(tm_theme_name.clone() + ".tmTheme");
                 if path.exists() {
-                    let maybe_theme = std::fs::read_to_string(&path);
-                    match maybe_theme {
-                        Ok(ref _theme) => (Some(tm_theme_name), maybe_theme.ok()),
-                        Err(e) => {
-                            eprintln!("failed to load {}: {e}", path.display());
-                            (Some(tm_theme_name), None)
-                        }
-                    }
+                    retrieve_tm_theme(&tm_theme_name, &path)
                 } else {
                     let path = PathBuf::from(built_in_tm_theme_dir)
                         .join(tm_theme_name.clone() + ".tmTheme");
                     if path.exists() {
                         eprintln!("Retrieving {tm_theme_name} from built-in TM theme directory");
-                        let maybe_theme = std::fs::read_to_string(&path);
-                        match maybe_theme {
-                            Ok(ref _theme) => (Some(tm_theme_name), maybe_theme.ok()),
-                            Err(e) => {
-                                eprintln!("failed to load {}: {e}", path.display());
-                                (Some(tm_theme_name), None)
-                            }
-                        }
+                        retrieve_tm_theme(&tm_theme_name, &path)
                     } else {
                         eprintln!("Path {} not found", path.display());
                         (Some(tm_theme_name), None)
@@ -1160,6 +1148,17 @@ fn retrieve_config_tm_theme(
             }
         });
     (tm_theme_name, tm_theme_content)
+}
+
+fn retrieve_tm_theme(tm_theme_name: &str, path: &PathBuf) -> (Option<String>, Option<String>) {
+    let maybe_theme = fs::read_to_string(path);
+    match maybe_theme {
+        Ok(ref _theme) => (Some(tm_theme_name.to_owned()), maybe_theme.ok()),
+        Err(e) => {
+            eprintln!("failed to load {}: {e}", path.display());
+            (Some(tm_theme_name.to_owned()), None)
+        }
+    }
 }
 
 // Retrieve from config directory if any
@@ -1537,7 +1536,7 @@ impl MarkdownApp {
     /// Returns `true` on success. Re-arms the file watcher for the new path.
     #[allow(clippy::cast_precision_loss)]
     fn load_file(&mut self, path: PathBuf) -> bool {
-        match std::fs::read_to_string(&path) {
+        match fs::read_to_string(&path) {
             Ok(raw) => {
                 // Hard size limit: refuse files that would make the UI unusable.
                 const MAX_BYTES: usize = 50_000_000; // 50 MB
@@ -2107,7 +2106,7 @@ impl MarkdownApp {
             .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or("custom");
-        let result = std::fs::read_to_string(&path)
+        let result = fs::read_to_string(&path)
             .map_err(|e| e.to_string())
             .and_then(|src| parse_base16_yaml(&src, stem));
 
@@ -2159,7 +2158,7 @@ impl MarkdownApp {
             .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or("custom");
-        let result = std::fs::read_to_string(&path).map_err(|e| e.to_string());
+        let result = fs::read_to_string(&path).map_err(|e| e.to_string());
 
         match result {
             Ok(theme) => (
