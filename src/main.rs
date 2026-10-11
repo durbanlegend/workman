@@ -821,10 +821,9 @@ fn detect_locale() -> String {
     .to_string()
 }
 
-#[allow(clippy::cast_precision_loss, clippy::too_many_lines)]
 fn main() -> eframe::Result<()> {
     // Hard size limit — refuse immediately so the GUI doesn't freeze.
-    const MAX_BYTES: usize = 50_000_000;
+    // const MAX_BYTES: usize = 50_000_000;
 
     // Check for help first - automatically extracts from source comments
     let help = auto_help!();
@@ -850,28 +849,7 @@ fn main() -> eframe::Result<()> {
         return Ok(());
     }
 
-    let selected_file: Option<PathBuf> = if args.len() > 1 {
-        let input_path = Path::new(&args[1]);
-        if !input_path.exists() {
-            eprintln!("Error: Input file does not exist: {}", input_path.display());
-            std::process::exit(1);
-        }
-        if input_path.is_dir() {
-            eprintln!("Error: Input path is a directory: {}", input_path.display());
-            let _ = env::set_current_dir(input_path);
-            None
-        } else if input_path.extension().is_some_and(|e| e == "md") {
-            Some(input_path.to_path_buf())
-        } else {
-            eprintln!(
-                "Error: Input file has unsupported extension: {}; must be `md`",
-                input_path.display()
-            );
-            std::process::exit(1);
-        }
-    } else {
-        None
-    };
+    let file_arg = resolve_file_arg(&args);
 
     let search_collapsible =
         env::args().any(|x| x == "-s" || x == "-sf" || x == "-fs" || x == "--search-collapsible");
@@ -879,74 +857,10 @@ fn main() -> eframe::Result<()> {
     #[cfg(unix)]
     detach_if_tty();
 
-    let (canonical_initial_path, raw_content, markdown_content, toc) = selected_file.map_or_else(
-        || {
-            let canonical_initial_path = env::current_dir()
-                .unwrap_or_default()
-                .canonicalize()
-                .unwrap_or_default();
-            let raw_content = t!(
-                "welcome.instruction",
-                cmd = MOD,
-                open_files = OPEN_FILES_ICON,
-                hist_back = HIST_BACK_ICON,
-                hist_forward = HIST_FWD_ICON
-            )
-            .to_string();
-            let (id_injected, toc) = extract_toc_and_inject_ids(&raw_content);
-            let markdown_content = absolutize_image_paths(&id_injected, &canonical_initial_path);
-            (canonical_initial_path, raw_content, markdown_content, toc)
-        },
-        |file| {
-            let selected_path = PathBuf::from(&file);
-            let canonical_initial_path = selected_path.canonicalize().unwrap_or(selected_path);
-            let initial_base_dir = canonical_initial_path
-                .parent()
-                .unwrap_or_else(|| Path::new("."))
-                .to_path_buf();
-            // Keep CWD in sync for canonicalize() calls inside the viewer.
-            let _ = env::set_current_dir(&initial_base_dir);
-
-            let raw_content = fs::read_to_string(&canonical_initial_path).unwrap_or_else(|_| {
-                format!(
-                    "# Error\nFailed to read `{}`.",
-                    canonical_initial_path.display()
-                )
-            });
-            let raw_content = if raw_content.len() > MAX_BYTES {
-                let size_mb = raw_content.len() as f64 / 1e6;
-                eprintln!(
-                    "workman: file too large ({size_mb:.1} MB): {}",
-                    canonical_initial_path.display()
-                );
-                format!(
-                    "# ⚠ File Too Large\n\n\
-                  Cannot render `{}`.\n\n\
-                  **File size: {size_mb:.1} MB** — exceeds the {:.0} MB limit.\n\n\
-                  Rendering files this large would make the UI unresponsive.\n\
-                  Consider splitting the file into smaller sections.",
-                    canonical_initial_path.display(),
-                    MAX_BYTES as f64 / 1e6,
-                )
-            } else {
-                raw_content
-            };
-            // Pre-screen for malformed code fences before any processing.
-            let raw_content = match validate_code_fences(&raw_content) {
-                Ok(()) => raw_content,
-                Err(ref fence_err) => {
-                    eprintln!(
-                        "workman: {}",
-                        fence_err_brief(fence_err, &canonical_initial_path)
-                    );
-                    fence_error_content(&canonical_initial_path, fence_err)
-                }
-            };
-            let (markdown_content, toc) =
-                prepare_markdown(&raw_content, &initial_base_dir, search_collapsible);
-            (canonical_initial_path, raw_content, markdown_content, toc)
-        },
-    );
+    let (canonical_initial_path, raw_content, markdown_content, toc) = file_arg
+        .map_or_else(init_empty(), |file| {
+            init_with_content(search_collapsible, &file)
+        });
 
     let options = eframe::NativeOptions {
         renderer: eframe::Renderer::Wgpu,
@@ -961,114 +875,37 @@ fn main() -> eframe::Result<()> {
     };
 
     // Load new default fonts
-    let mut fonts = egui::FontDefinitions::default();
-
-    let preferred_font = "Inter";
-
-    // Register the font data
-    fonts.font_data.insert(
-        preferred_font.to_owned(),
-        egui::FontData::from_static(include_bytes!(
-            "../assets/fonts/Inter-VariableFont_opsz,wght.ttf"
-        ))
-        .into(),
-    );
-
-    // Put it in proportional list
-    fonts
-        .families
-        .get_mut(&egui::FontFamily::Proportional)
-        .unwrap()
-        .insert(0, preferred_font.to_owned());
-
-    // Do the same for monospace
-    let monospace_font = "Hack";
-    fonts.font_data.insert(
-        monospace_font.to_owned(),
-        egui::FontData::from_static(include_bytes!("../assets/fonts/Hack-Regular.ttf")).into(),
-    );
-
-    // Put it in monospace list
-    fonts
-        .families
-        .get_mut(&egui::FontFamily::Monospace)
-        .unwrap()
-        .insert(0, monospace_font.to_owned());
-
-    // Add it to end of proportional list as a fallback, e.g. displaying widgets in help screen
-    fonts
-        .families
-        .get_mut(&egui::FontFamily::Proportional)
-        .unwrap()
-        .push(monospace_font.to_owned());
+    let fonts = install_fonts();
 
     let config = config::maybe_config();
     // eprintln!("config.theming={:#?}", config.as_ref().unwrap().theming);
-    let config_default_theme = config
-        .as_ref()
-        .and_then(|config| config.theming.default_theme.clone());
-    let (maybe_theme_name, maybe_base16_built_in): (Option<&'static str>, Option<&Base16>) =
-        config_default_theme.map_or((None, None), |default_theme| {
-            let maybe_base16_built_in = B16_THEME_MAP.get(&default_theme);
-            let built_in_name = Box::leak(default_theme.clone().into_boxed_str());
-            if maybe_base16_built_in.is_some() {
-                (Some(built_in_name), maybe_base16_built_in)
-            } else {
-                // eprintln!("Error retrieving theme {default_theme} from preloaded theme map");
-                (Some(built_in_name), None)
-            }
-        });
-    let maybe_base_16_loaded: Option<Base16> = if maybe_base16_built_in.is_none()
-        && let Some(theme_name) = maybe_theme_name
-    {
-        retrieve_config_theme(config.as_ref(), theme_name, BUILT_IN_THEME_DIR)
-    } else {
-        None
-    };
+    let (maybe_theme_name, maybe_base16_built_in, maybe_base_16_loaded) =
+        resolve_base16_theme(config.as_ref());
 
     let tm_theme_dark_name =
         config::maybe_config().and_then(|config| config.theming.default_tm_theme_dark);
     let tm_theme_dark_content = tm_theme_dark_name.as_ref().and_then(|theme_dark_name| {
         retrieve_config_tm_theme(config.as_ref(), theme_dark_name, BUILT_IN_TM_THEME_DIR)
     });
+    let tm_dark_name = resolve_tm_name(
+        tm_theme_dark_name.as_deref(),
+        tm_theme_dark_content.as_deref(),
+        true,
+    );
     eprintln!(
         "config_default_tm_theme_dark={tm_theme_dark_name:?}, tm_theme_dark_name={tm_theme_dark_name:?}"
     );
-    let tm_dark_name = {
-        match (tm_theme_dark_name, &tm_theme_dark_content) {
-            (None, _) => dark_or_light_theme(true),
-            (Some(tm_theme_name), None) => {
-                // No directory configured => prebuilt or default
-                if TM_THEME_MAP.contains_key(&tm_theme_name) {
-                    Box::leak(tm_theme_name.into_boxed_str())
-                } else {
-                    dark_or_light_theme(true)
-                }
-            }
-            (Some(tm_theme_name), Some(_)) => Box::leak(tm_theme_name.into_boxed_str()),
-        }
-    };
 
     let tm_theme_light_name =
         config::maybe_config().and_then(|config| config.theming.default_tm_theme_light);
     let tm_theme_light_content = tm_theme_light_name.as_ref().and_then(|theme_light_name| {
         retrieve_config_tm_theme(config.as_ref(), theme_light_name, BUILT_IN_TM_THEME_DIR)
-    }); // eprintln!("1. tm_theme_light_name={tm_theme_light_name:?}");
-    let tm_light_name = {
-        match (tm_theme_light_name, &tm_theme_light_content) {
-            (None, _) => dark_or_light_theme(false),
-            (Some(tm_theme_name), None) => {
-                // No directory configured => prebuilt or default
-                if TM_THEME_MAP.contains_key(&tm_theme_name) {
-                    Box::leak(tm_theme_name.into_boxed_str())
-                } else {
-                    dark_or_light_theme(false)
-                }
-            }
-            (Some(tm_theme_name), Some(_)) => Box::leak(tm_theme_name.into_boxed_str()),
-        }
-    };
-    // eprintln!("2. tm_light_name={tm_light_name:?}");
+    });
+    let tm_light_name = resolve_tm_name(
+        tm_theme_light_name.as_deref(),
+        tm_theme_light_content.as_deref(),
+        false,
+    );
 
     let theme_config = ThemeConfig::new(
         maybe_theme_name,
@@ -1114,6 +951,201 @@ fn main() -> eframe::Result<()> {
             )))
         }),
     )
+}
+
+fn resolve_file_arg(args: &[String]) -> Option<PathBuf> {
+    let file_arg: Option<PathBuf> = if args.len() > 1 {
+        let input_path = Path::new(&args[1]);
+        if !input_path.exists() {
+            eprintln!("Error: Input file does not exist: {}", input_path.display());
+            std::process::exit(1);
+        }
+        if input_path.is_dir() {
+            eprintln!("Error: Input path is a directory: {}", input_path.display());
+            let _ = env::set_current_dir(input_path);
+            None
+        } else if input_path.extension().is_some_and(|e| e == "md") {
+            Some(input_path.to_path_buf())
+        } else {
+            eprintln!(
+                "Error: Input file has unsupported extension: {}; must be `md`",
+                input_path.display()
+            );
+            std::process::exit(1);
+        }
+    } else {
+        None
+    };
+    file_arg
+}
+
+fn resolve_tm_name(
+    tm_theme_name: Option<&str>,
+    tm_theme_content: Option<&str>,
+    is_dark: bool,
+) -> &'static str {
+    match (tm_theme_name, tm_theme_content) {
+        (None, _) => dark_or_light_theme(is_dark),
+        (Some(tm_theme_name), None) => {
+            // No directory configured => prebuilt or default
+            if TM_THEME_MAP.contains_key(tm_theme_name) {
+                Box::leak(String::from(tm_theme_name).into_boxed_str())
+            } else {
+                dark_or_light_theme(is_dark)
+            }
+        }
+        (Some(tm_theme_name), Some(_)) => Box::leak(String::from(tm_theme_name).into_boxed_str()),
+    }
+}
+
+fn resolve_base16_theme(
+    config: Option<&config::Config>,
+) -> (Option<&'static str>, Option<&Base16>, Option<Base16>) {
+    let config_default_theme = config
+        .as_ref()
+        .and_then(|config| config.theming.default_theme.clone());
+    let (maybe_theme_name, maybe_base16_built_in): (Option<&'static str>, Option<&Base16>) =
+        config_default_theme.map_or((None, None), |default_theme| {
+            let maybe_base16_built_in = B16_THEME_MAP.get(&default_theme);
+            let built_in_name = Box::leak(default_theme.clone().into_boxed_str());
+            if maybe_base16_built_in.is_some() {
+                (Some(built_in_name), maybe_base16_built_in)
+            } else {
+                // eprintln!("Error retrieving theme {default_theme} from preloaded theme map");
+                (Some(built_in_name), None)
+            }
+        });
+    let maybe_base_16_loaded: Option<Base16> = if maybe_base16_built_in.is_none()
+        && let Some(theme_name) = maybe_theme_name
+    {
+        retrieve_config_theme(config, theme_name, BUILT_IN_THEME_DIR)
+    } else {
+        None
+    };
+    (
+        maybe_theme_name,
+        maybe_base16_built_in,
+        maybe_base_16_loaded,
+    )
+}
+
+fn install_fonts() -> egui::FontDefinitions {
+    let mut fonts = egui::FontDefinitions::default();
+
+    let preferred_font = "Inter";
+
+    // Register the font data
+    fonts.font_data.insert(
+        preferred_font.to_owned(),
+        egui::FontData::from_static(include_bytes!(
+            "../assets/fonts/Inter-VariableFont_opsz,wght.ttf"
+        ))
+        .into(),
+    );
+
+    // Put it in proportional list
+    fonts
+        .families
+        .get_mut(&egui::FontFamily::Proportional)
+        .unwrap()
+        .insert(0, preferred_font.to_owned());
+
+    // Do the same for monospace
+    let monospace_font = "Hack";
+    fonts.font_data.insert(
+        monospace_font.to_owned(),
+        egui::FontData::from_static(include_bytes!("../assets/fonts/Hack-Regular.ttf")).into(),
+    );
+
+    // Put it in monospace list
+    fonts
+        .families
+        .get_mut(&egui::FontFamily::Monospace)
+        .unwrap()
+        .insert(0, monospace_font.to_owned());
+
+    // Add it to end of proportional list as a fallback, e.g. displaying widgets in help screen
+    fonts
+        .families
+        .get_mut(&egui::FontFamily::Proportional)
+        .unwrap()
+        .push(monospace_font.to_owned());
+    fonts
+}
+
+fn init_empty() -> impl FnOnce() -> (PathBuf, String, String, Vec<TocEntry>) {
+    || {
+        let canonical_initial_path = env::current_dir()
+            .unwrap_or_default()
+            .canonicalize()
+            .unwrap_or_default();
+        let raw_content = t!(
+            "welcome.instruction",
+            cmd = MOD,
+            open_files = OPEN_FILES_ICON,
+            hist_back = HIST_BACK_ICON,
+            hist_forward = HIST_FWD_ICON
+        )
+        .to_string();
+        let (id_injected, toc) = extract_toc_and_inject_ids(&raw_content);
+        let markdown_content = absolutize_image_paths(&id_injected, &canonical_initial_path);
+        (canonical_initial_path, raw_content, markdown_content, toc)
+    }
+}
+
+#[expect(clippy::cast_precision_loss)]
+fn init_with_content(
+    search_collapsible: bool,
+    file: &PathBuf,
+) -> (PathBuf, String, String, Vec<TocEntry>) {
+    const MAX_BYTES: usize = 50_000_000;
+    let selected_path = PathBuf::from(&file);
+    let canonical_initial_path = selected_path.canonicalize().unwrap_or(selected_path);
+    let initial_base_dir = canonical_initial_path
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .to_path_buf();
+    // Keep CWD in sync for canonicalize() calls inside the viewer.
+    let _ = env::set_current_dir(&initial_base_dir);
+
+    let raw_content = fs::read_to_string(&canonical_initial_path).unwrap_or_else(|_| {
+        format!(
+            "# Error\nFailed to read `{}`.",
+            canonical_initial_path.display()
+        )
+    });
+    let raw_content = if raw_content.len() > MAX_BYTES {
+        let size_mb = raw_content.len() as f64 / 1e6;
+        eprintln!(
+            "workman: file too large ({size_mb:.1} MB): {}",
+            canonical_initial_path.display()
+        );
+        format!(
+            "# ⚠ File Too Large\n\n\
+                  Cannot render `{}`.\n\n\
+                  **File size: {size_mb:.1} MB** — exceeds the {:.0} MB limit.\n\n\
+                  Rendering files this large would make the UI unresponsive.\n\
+                  Consider splitting the file into smaller sections.",
+            canonical_initial_path.display(),
+            MAX_BYTES as f64 / 1e6,
+        )
+    } else {
+        raw_content
+    };
+    // Pre-screen for malformed code fences before any processing.
+    let raw_content = match validate_code_fences(&raw_content) {
+        Ok(()) => raw_content,
+        Err(ref fence_err) => {
+            eprintln!(
+                "workman: {}",
+                fence_err_brief(fence_err, &canonical_initial_path)
+            );
+            fence_error_content(&canonical_initial_path, fence_err)
+        }
+    };
+    let (markdown_content, toc) =
+        prepare_markdown(&raw_content, &initial_base_dir, search_collapsible);
+    (canonical_initial_path, raw_content, markdown_content, toc)
 }
 
 // Retrieve from config directory if any
@@ -1528,7 +1560,7 @@ impl MarkdownApp {
 
     /// Load `path` from disk and update content, TOC, raw content, and CWD.
     /// Returns `true` on success. Re-arms the file watcher for the new path.
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     fn load_file(&mut self, path: PathBuf) -> bool {
         match fs::read_to_string(&path) {
             Ok(raw) => {
@@ -2284,7 +2316,7 @@ fn add_code_block_themes(cache: &mut CommonMarkCache) {
 }
 
 impl eframe::App for MarkdownApp {
-    #[allow(clippy::cast_precision_loss, clippy::too_many_lines)]
+    #[expect(clippy::cast_precision_loss, clippy::too_many_lines)]
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         const RED_ALERT: usize = 10_000_000;
         const AMBER_ALERT: usize = 2_000_000;
