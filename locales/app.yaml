@@ -1147,6 +1147,15 @@ help.text:
     | Home / Cmd-Up | Jump to top of document (Fn-Left on Mac) |
     | End / Cmd-Down | Jump to bottom of document (Fn-Right on Mac) |
 
+    ### Configuration
+    Saving themes from the Themes window will create or update a configuration file at the following location:
+    | Platform | Location |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    The previous file will be saved with the extension `yyyymmdd-HHMMss`. The files are small: about 250 bytes.
+
     ### Help
     | Key | Action |
     |---|---|

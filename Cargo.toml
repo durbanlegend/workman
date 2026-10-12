@@ -41,6 +41,7 @@ path = "src/main.rs"
 
 [dependencies]
 base16 = { path = "crates/base16" }
+chrono = "0.4"
 dirs = "7"
 documented = "0.10"
 edit = "0.1"

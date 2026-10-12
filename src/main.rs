@@ -69,6 +69,9 @@ const ALT: &str = "Alt";
 #[cfg(not(target_os = "macos"))]
 const MOD: &str = "Ctrl";
 
+// Hard size limit — refuse immediately so the GUI doesn't freeze.
+const MAX_BYTES: usize = 50_000_000;
+
 /// Documents at or above this byte count get the viewport-cache toggle shown in
 /// the toolbar and have caching auto-enabled.  Below this size the simple
 /// full-document render path is always used (accurate + fast enough).
@@ -822,9 +825,6 @@ fn detect_locale() -> String {
 }
 
 fn main() -> eframe::Result<()> {
-    // Hard size limit — refuse immediately so the GUI doesn't freeze.
-    // const MAX_BYTES: usize = 50_000_000;
-
     // Check for help first - automatically extracts from source comments
     let help = auto_help!();
     check_help_and_exit(&help);
@@ -891,9 +891,6 @@ fn main() -> eframe::Result<()> {
         tm_theme_dark_name.as_deref(),
         tm_theme_dark_content.as_deref(),
         true,
-    );
-    eprintln!(
-        "config_default_tm_theme_dark={tm_theme_dark_name:?}, tm_theme_dark_name={tm_theme_dark_name:?}"
     );
 
     let tm_theme_light_name =
@@ -1098,7 +1095,6 @@ fn init_with_content(
     search_collapsible: bool,
     file: &PathBuf,
 ) -> (PathBuf, String, String, Vec<TocEntry>) {
-    const MAX_BYTES: usize = 50_000_000;
     let selected_path = PathBuf::from(&file);
     let canonical_initial_path = selected_path.canonicalize().unwrap_or(selected_path);
     let initial_base_dir = canonical_initial_path
@@ -1293,7 +1289,7 @@ struct MarkdownApp {
     watcher: Option<notify::RecommendedWatcher>,
     /// Bridge-thread channel: a `()` arrives whenever the watched file changes.
     watcher_rx: Option<Receiver<()>>,
-    /// When set, a brief "reloaded" notice is shown in the toolbar until this instant.
+    /// When set, a brief "reloaded" notice is shown in the toolbar.
     last_reload: Option<Instant>,
     /// `true` until the end of the very first frame; used to request key-window focus
     /// on startup so that keyboard shortcuts work without requiring a prior mouse click.
@@ -1325,6 +1321,8 @@ struct MarkdownApp {
     tm_load_error: Option<String>,
     // config: Option<Config>,
     // config_theme: Option<&'static str>,
+    /// When set, a brief "saved" notice is shown next to the save button.
+    last_save: Option<Instant>,
 }
 
 impl MarkdownApp {
@@ -1404,6 +1402,7 @@ impl MarkdownApp {
             base16_filter: Base16Filter::All,
             base16_load_error: None,
             tm_load_error: None,
+            last_save: None,
             // config,
             // config_theme,
         };
@@ -1565,7 +1564,6 @@ impl MarkdownApp {
         match fs::read_to_string(&path) {
             Ok(raw) => {
                 // Hard size limit: refuse files that would make the UI unusable.
-                const MAX_BYTES: usize = 50_000_000; // 50 MB
                 if raw.len() > MAX_BYTES {
                     let size_mb = raw.len() as f64 / 1e6;
                     let err = format!(
@@ -1948,8 +1946,7 @@ impl MarkdownApp {
             .resizable(true)
             .default_size([420.0, 500.0])
             // Start near the top-right so the main document stays visible; still draggable.
-            // .default_pos(ctx.content_rect().left_top() + egui::vec2(0.0, 24.0))
-            .default_pos(ctx.content_rect().right_top() + egui::vec2(-440.0, 8.0))
+            .default_pos(ctx.content_rect().right_top() + egui::vec2(-440.0, 24.0))
             .show(ctx, |ui| {
                 let dark_mode = ui.visuals().dark_mode;
 
@@ -2051,6 +2048,7 @@ impl MarkdownApp {
                 let mut save_error: Option<String> = None;
                 ui.horizontal(|ui| {
                     ui.label("Save as default:");
+                    let path = RealContext::new().get_config_path();
                     if ui
                         .button("Save")
                         .on_hover_text("Save configuration")
@@ -2065,11 +2063,25 @@ impl MarkdownApp {
                                     self.tm_theme_light.map(String::from),
                                     config.theming.tm_theme_dir.or_else(|| tm_theme_path.map(|path| path.to_string_lossy().to_string())),
                                 );
-                                let path = RealContext::new().get_config_path();
+
+                                // Format the time as yyyymmdd-HHMMss
+                                let formatted_time = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
+                                let save_path = path.with_added_extension(formatted_time);
+                                // path.to_string_lossy();
+                                if path.exists() {
+                                    match fs::rename(&path, &save_path) {
+                                        Ok(()) => eprintln!("Renamed previous configuration to {}", save_path.display()),
+                                        Err(e) => eprintln!("Error {e} attempting to rename previous configuration to {}", save_path.display()),
+                                    }
+                                }
+
                                 let result = toml::to_string_pretty(&config);
                                 match result {
-                                    Ok(contents) => match write(path, contents) {
-                                        Ok(()) => (),
+                                    Ok(contents) => match write(&path, contents) {
+                                        Ok(()) => {
+                                            eprintln!("Saved configuration to {}", path.display());
+                                            self.last_save = Some(Instant::now());
+                                        },
                                         Err(e) => {
                                             let err = format!("Failed to save configuration: {e}");
                                             eprintln!("{err}");
@@ -2088,6 +2100,9 @@ impl MarkdownApp {
                     }
                     if let Some (err) = save_error {
                         ui.colored_label(ui.visuals().error_fg_color, err);
+                    } else if self.last_save.is_some_and(|t| t.elapsed() < Duration::from_secs(3)) {
+                        // ui.label(&format!("Saved to {}",path.display()));
+                        ui.label("Saved");
                     }
                 });
 
