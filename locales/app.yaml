@@ -1069,148 +1069,510 @@ toc.title:
   zu: "Okuqukethwe"
 
 themes.title:
-  en: "Themes"
-  fr: "Thèmes"
-  es: "Temas"
+  ca: "Temes"
+  cs: "Motivy"
+  cy: "Themâu"
+  da: "Temaer"
   de: "Designs"
+  el: "Θέματα"
+  en: "Themes"
+  es: "Temas"
+  fi: "Teemat"
+  fr: "Thèmes"
+  hr: "Teme"
+  hu: "Témák"
   it: "Temi"
+  nb: "Temaer"
+  nl: "Thema's"
+  pl: "Motywy"
   pt: "Temas"
+  ro: "Teme"
+  ru: "Темы"
+  sk: "Motívy"
+  sl: "Teme"
+  st: "Dihlooho"
+  sv: "Teman"
+  uk: "Теми"
+  xh: "Imixholo"
+  zu: "Izihloko"
 
 themes.main.load_label:
-  en: "Main theme:"
-  fr: "Thème principal :"
-  es: "Tema principal:"
+  ca: "Tema principal:"
+  cs: "Hlavní motiv:"
+  cy: "Prif thema:"
+  da: "Hovedtema:"
   de: "Haupt-Design:"
+  el: "Κύριο θέμα:"
+  en: "Main theme:"
+  es: "Tema principal:"
+  fi: "Pääteema:"
+  fr: "Thème principal :"
+  hr: "Glavna tema:"
+  hu: "Fő téma:"
   it: "Tema principale:"
+  nb: "Hovedtema:"
+  nl: "Hoofdthema:"
+  pl: "Motyw główny:"
   pt: "Tema principal:"
+  ro: "Tema principală:"
+  ru: "Основная тема:"
+  sk: "Hlavný motív:"
+  sl: "Glavna tema:"
+  st: "Sehlooho se seholo:"
+  sv: "Huvudtema:"
+  uk: "Основна тема:"
+  xh: "Umxholo ophambili:"
+  zu: "Isihloko esiyinhloko:"
 
 themes.load_button:
-  en: "📂 Load…"
-  fr: "📂 Charger…"
-  es: "📂 Cargar…"
+  ca: "📂 Carrega…"
+  cs: "📂 Načíst…"
+  cy: "📂 Llwytho…"
+  da: "📂 Indlæs…"
   de: "📂 Laden…"
+  el: "📂 Φόρτωση…"
+  en: "📂 Load…"
+  es: "📂 Cargar…"
+  fi: "📂 Lataa…"
+  fr: "📂 Charger…"
+  hr: "📂 Učitaj…"
+  hu: "📂 Betöltés…"
   it: "📂 Carica…"
+  nb: "📂 Last inn…"
+  nl: "📂 Laden…"
+  pl: "📂 Wczytaj…"
   pt: "📂 Carregar…"
+  ro: "📂 Încarcă…"
+  ru: "📂 Загрузить…"
+  sk: "📂 Načítať…"
+  sl: "📂 Naloži…"
+  st: "📂 Kenya…"
+  sv: "📂 Läs in…"
+  uk: "📂 Завантажити…"
+  xh: "📂 Layisha…"
+  zu: "📂 Layisha…"
 
 themes.main.load_tip:
-  en: "Load a Base16 YAML theme file"
-  fr: "Charger un fichier de thème Base16 YAML"
-  es: "Cargar un archivo de tema Base16 YAML"
+  ca: "Trieu un tema d'interfície"
+  cs: "Vyberte motiv uživatelského rozhraní"
+  cy: "Dewiswch thema UI"
+  da: "Vælg et UI-tema"
   de: "Base16-YAML-Designdatei laden"
+  el: "Επιλέξτε ένα θέμα διεπαφής χρήστη"
+  en: "Load a Base16 YAML theme file"
+  es: "Cargar un archivo de tema Base16 YAML"
+  fi: "Valitse käyttöliittymän teema"
+  fr: "Charger un fichier de thème Base16 YAML"
+  hr: "Odaberite temu korisničkog sučelja"
+  hu: "Válasszon felhasználói felület témát"
   it: "Carica un file di tema Base16 YAML"
+  nb: "Velg et UI-tema"
+  nl: "Kies een UI-thema"
+  pl: "Wybierz motyw interfejsu"
   pt: "Carregar um ficheiro de tema Base16 YAML"
+  ro: "Alegeți o temă pentru interfață"
+  ru: "Выберите тему интерфейса"
+  sk: "Vyberte motív používateľského rozhrania"
+  sl: "Izberite temo uporabniškega vmesnika"
+  st: "Khetha sehlooho sa UI"
+  sv: "Välj ett UI-tema"
+  uk: "Виберіть тему інтерфейсу"
+  xh: "Khetha umxholo we-UI"
+  zu: "Khetha isihloko se-UI"
 
 themes.code.label:
-  en: "Code themes:"
-  fr: "Thèmes de code :"
-  es: "Temas de código:"
+  ca: "Temes de codi:"
+  cs: "Motivy kódu:"
+  cy: "Themâu cod:"
+  da: "Kodetemaer:"
   de: "Code-Designs:"
+  el: "Θέματα κώδικα:"
+  en: "Code themes:"
+  es: "Temas de código:"
+  fi: "Koodin teemat:"
+  fr: "Thèmes de code :"
+  hr: "Teme koda:"
+  hu: "Kódtémák:"
   it: "Temi del codice:"
+  nb: "Kodetemaer:"
+  nl: "Codethema's:"
+  pl: "Motywy kodu:"
   pt: "Temas de código:"
+  ro: "Teme de cod:"
+  ru: "Темы кода:"
+  sk: "Motívy kódu:"
+  sl: "Teme kode:"
+  st: "Dihlooho tsa khoutu:"
+  sv: "Kodteman:"
+  uk: "Теми коду:"
+  xh: "Imixholo yekhowudi:"
+  zu: "Izihloko zekhodi:"
 
 themes.code.radio_dark:
-  en: "Only dark"
-  fr: "Sombre uniquement"
-  es: "Solo oscuro"
+  ca: "Només fosc"
+  cs: "Pouze tmavé"
+  cy: "Tywyll yn unig"
+  da: "Kun mørk"
   de: "Nur dunkel"
+  el: "Μόνο σκούρο"
+  en: "Only dark"
+  es: "Solo oscuro"
+  fi: "Vain tumma"
+  fr: "Sombre uniquement"
+  hr: "Samo tamno"
+  hu: "Csak sötét"
   it: "Solo scuro"
+  nb: "Kun mørk"
+  nl: "Alleen donker"
+  pl: "Tylko ciemne"
   pt: "Apenas escuro"
+  ro: "Doar întunecat"
+  ru: "Только тёмная"
+  sk: "Len tmavé"
+  sl: "Samo temno"
+  st: "Lefifi feela"
+  sv: "Endast mörkt"
+  uk: "Тільки темна"
+  xh: "Umnyama kuphela"
+  zu: "Okumnyama kuphela"
 
 themes.code.radio_light:
-  en: "Only light"
-  fr: "Clair uniquement"
-  es: "Solo claro"
+  ca: "Només clar"
+  cs: "Pouze světlé"
+  cy: "Golau yn unig"
+  da: "Kun lys"
   de: "Nur hell"
+  el: "Μόνο ανοιχτό"
+  en: "Only light"
+  es: "Solo claro"
+  fi: "Vain vaalea"
+  fr: "Clair uniquement"
+  hr: "Samo svijetlo"
+  hu: "Csak világos"
   it: "Solo chiaro"
+  nb: "Kun lys"
+  nl: "Alleen licht"
+  pl: "Tylko jasne"
   pt: "Apenas claro"
+  ro: "Doar luminos"
+  ru: "Только светлая"
+  sk: "Len svetlé"
+  sl: "Samo svetlo"
+  st: "Leseli feela"
+  sv: "Endast ljust"
+  uk: "Тільки світла"
+  xh: "Ukukhanya kuphela"
+  zu: "Okukhanyayo kuphela"
 
 themes.code.radio_all:
-  en: "All"
-  fr: "Tous"
-  es: "Todos"
+  ca: "Tots"
+  cs: "Vše"
+  cy: "Pob un"
+  da: "Alle"
   de: "Alle"
+  el: "Όλα"
+  en: "All"
+  es: "Todos"
+  fi: "Kaikki"
+  fr: "Tous"
+  hr: "Sve"
+  hu: "Összes"
   it: "Tutti"
+  nb: "Alle"
+  nl: "Alle"
+  pl: "Wszystkie"
   pt: "Todos"
+  ro: "Toate"
+  ru: "Все"
+  sk: "Všetky"
+  sl: "Vse"
+  st: "Tsohle"
+  sv: "Alla"
+  uk: "Усі"
+  xh: "Konke"
+  zu: "Konke"
 
 themes.code.load_tip:
-  en: "Load a .tmTheme file"
-  fr: "Charger un fichier .tmTheme"
-  es: "Cargar un archivo .tmTheme"
+  ca: "Carrega un fitxer .tmTheme"
+  cs: "Načíst soubor .tmTheme"
+  cy: "Llwytho ffeil .tmTheme"
+  da: "Indlæs en .tmTheme-fil"
   de: ".tmTheme-Datei laden"
+  el: "Φόρτωση αρχείου .tmTheme"
+  en: "Load a .tmTheme file"
+  es: "Cargar un archivo .tmTheme"
+  fi: "Lataa .tmTheme-tiedosto"
+  fr: "Charger un fichier .tmTheme"
+  hr: "Učitaj datoteku .tmTheme"
+  hu: ".tmTheme fájl betöltése"
   it: "Carica un file .tmTheme"
+  nb: "Last inn en .tmTheme-fil"
+  nl: "Een .tmTheme-bestand laden"
+  pl: "Wczytaj plik .tmTheme"
   pt: "Carregar um ficheiro .tmTheme"
+  ro: "Încarcă un fișier .tmTheme"
+  ru: "Загрузить файл .tmTheme"
+  sk: "Načítať súbor .tmTheme"
+  sl: "Naloži datoteko .tmTheme"
+  st: "Kenya faele ya .tmTheme"
+  sv: "Läs in en .tmTheme-fil"
+  uk: "Завантажити файл .tmTheme"
+  xh: "Layisha ifayile ye-.tmTheme"
+  zu: "Layisha ifayela le-.tmTheme"
 
 themes.code.label.dark_mode:
-  en: "Dark code theme:"
-  fr: "Thème de code sombre :"
-  es: "Tema de código oscuro:"
+  ca: "Tema de codi fosc:"
+  cs: "Tmavý motiv kódu:"
+  cy: "Thema cod tywyll:"
+  da: "Mørkt kodetema:"
   de: "Dunkles Code-Design:"
+  el: "Σκούρο θέμα κώδικα:"
+  en: "Dark code theme:"
+  es: "Tema de código oscuro:"
+  fi: "Tumma koodin teema:"
+  fr: "Thème de code sombre :"
+  hr: "Tamna tema koda:"
+  hu: "Sötét kódtéma:"
   it: "Tema del codice scuro:"
+  nb: "Mørkt kodetema:"
+  nl: "Donker codethema:"
+  pl: "Ciemny motyw kodu:"
   pt: "Tema de código escuro:"
+  ro: "Temă de cod întunecată:"
+  ru: "Тёмная тема кода:"
+  sk: "Tmavý motív kódu:"
+  sl: "Temna tema kode:"
+  st: "Sehlooho sa khoutu se lefifi:"
+  sv: "Mörkt kodtema:"
+  uk: "Темна тема коду:"
+  xh: "Umxholo wekhowudi omnyama:"
+  zu: "Isihloko sekhodi esimnyama:"
 
 themes.code.label.light_mode:
-  en: "Light code theme:"
-  fr: "Thème de code clair :"
-  es: "Tema de código claro:"
+  ca: "Tema de codi clar:"
+  cs: "Světlý motiv kódu:"
+  cy: "Thema cod golau:"
+  da: "Lyst kodetema:"
   de: "Helles Code-Design:"
+  el: "Ανοιχτό θέμα κώδικα:"
+  en: "Light code theme:"
+  es: "Tema de código claro:"
+  fi: "Vaalea koodin teema:"
+  fr: "Thème de code clair :"
+  hr: "Svijetla tema koda:"
+  hu: "Világos kódtéma:"
   it: "Tema del codice chiaro:"
+  nb: "Lyst kodetema:"
+  nl: "Licht codethema:"
+  pl: "Jasny motyw kodu:"
   pt: "Tema de código claro:"
+  ro: "Temă de cod luminoasă:"
+  ru: "Светлая тема кода:"
+  sk: "Svetlý motív kódu:"
+  sl: "Svetla tema kode:"
+  st: "Sehlooho sa khoutu se leseli:"
+  sv: "Ljust kodtema:"
+  uk: "Світла тема коду:"
+  xh: "Umxholo wekhowudi okhanyayo:"
+  zu: "Isihloko sekhodi esikhanyayo:"
 
 themes.save_label:
-  en: "Save as default:"
-  fr: "Enregistrer par défaut :"
-  es: "Guardar como predeterminado:"
+  ca: "Desa com a predeterminat:"
+  cs: "Uložit jako výchozí:"
+  cy: "Cadw fel rhagosodiad:"
+  da: "Gem som standard:"
   de: "Als Standard speichern:"
+  el: "Αποθήκευση ως προεπιλογή:"
+  en: "Save as default:"
+  es: "Guardar como predeterminado:"
+  fi: "Tallenna oletukseksi:"
+  fr: "Enregistrer par défaut :"
+  hr: "Spremi kao zadano:"
+  hu: "Mentés alapértelmezettként:"
   it: "Salva come predefinito:"
+  nb: "Lagre som standard:"
+  nl: "Opslaan als standaard:"
+  pl: "Zapisz jako domyślne:"
   pt: "Guardar como predefinição:"
+  ro: "Salvează ca implicit:"
+  ru: "Сохранить по умолчанию:"
+  sk: "Uložiť ako predvolené:"
+  sl: "Shrani kot privzeto:"
+  st: "Boloka e le tlhaelo:"
+  sv: "Spara som standard:"
+  uk: "Зберегти як типову:"
+  xh: "Gcina njengokumiselweyo:"
+  zu: "Londoloza njengokuzenzakalelayo:"
 
 themes.save_button:
-  en: "Save:"
-  fr: "Enregistrer :"
-  es: "Guardar:"
-  de: "Speichern:"
-  it: "Salva:"
-  pt: "Guardar:"
+  en: "Save"
+  fr: "Enregistrer"
+  es: "Guardar"
+  de: "Speichern"
+  it: "Salva"
+  pt: "Guardar"
+  af: "Stoor"
+  bg: "Запази"
+  ca: "Desa"
+  cs: "Uložit"
+  cy: "Cadw"
+  da: "Gem"
+  el: "Αποθήκευση"
+  fi: "Tallenna"
+  hr: "Spremi"
+  hu: "Mentés"
+  nb: "Lagre"
+  nl: "Opslaan"
+  pl: "Zapisz"
+  ro: "Salvează"
+  ru: "Сохранить"
+  sk: "Uložiť"
+  sl: "Shrani"
+  st: "Boloka"
+  sv: "Spara"
+  uk: "Зберегти"
+  xh: "Gcina"
+  zu: "Londoloza"
 
 themes.save_tip:
-  en: "Save configuration:"
-  fr: "Enregistrer la configuration :"
-  es: "Guardar configuración:"
+  ca: "Desa la configuració:"
+  cs: "Uložit konfiguraci:"
+  cy: "Cadw'r ffurfweddiad:"
+  da: "Gem konfiguration:"
   de: "Konfiguration speichern:"
+  el: "Αποθήκευση διαμόρφωσης:"
+  en: "Save configuration:"
+  es: "Guardar configuración:"
+  fi: "Tallenna asetukset:"
+  fr: "Enregistrer la configuration :"
+  hr: "Spremi konfiguraciju:"
+  hu: "Konfiguráció mentése:"
   it: "Salva configurazione:"
+  nb: "Lagre konfigurasjon:"
+  nl: "Configuratie opslaan:"
+  pl: "Zapisz konfigurację:"
   pt: "Guardar configuração:"
+  ro: "Salvează configurația:"
+  ru: "Сохранить конфигурацию:"
+  sk: "Uložiť konfiguráciu:"
+  sl: "Shrani konfiguracijo:"
+  st: "Boloka peakanyo:"
+  sv: "Spara konfiguration:"
+  uk: "Зберегти конфігурацію:"
+  xh: "Gcina umsesane:"
+  zu: "Londoloza umlungiselelo:"
 
 themes.saved:
-  en: "Configuration saved"
-  fr: "Configuration enregistrée"
-  es: "Configuración guardada"
+  ca: "Configuració desada"
+  cs: "Konfigurace uložena"
+  cy: "Ffurfweddiad wedi'i gadw"
+  da: "Konfiguration gemt"
   de: "Konfiguration gespeichert"
+  el: "Η διαμόρφωση αποθηκεύτηκε"
+  en: "Configuration saved"
+  es: "Configuración guardada"
+  fi: "Asetukset tallennettu"
+  fr: "Configuration enregistrée"
+  hr: "Konfiguracija spremljena"
+  hu: "Konfiguráció mentve"
   it: "Configurazione salvata"
+  nb: "Konfigurasjon lagret"
+  nl: "Configuratie opgeslagen"
+  pl: "Konfiguracja zapisana"
   pt: "Configuração guardada"
+  ro: "Configurație salvată"
+  ru: "Конфигурация сохранена"
+  sk: "Konfigurácia uložená"
+  sl: "Konfiguracija shranjena"
+  st: "Peakanyo e bolokiloe"
+  sv: "Konfiguration sparad"
+  uk: "Конфігурацію збережено"
+  xh: "Umsesane ugciniwe"
+  zu: "Umlungiselelo ulondoloziwe"
 
 themes.sample.preview:
-  en: "Theme preview"
-  fr: "Aperçu du thème"
-  es: "Vista previa del tema"
+  ca: "Previsualització del tema"
+  cs: "Náhled motivu"
+  cy: "Rhagolwg thema"
+  da: "Temaforhåndsvisning"
   de: "Design-Vorschau"
+  el: "Προεπισκόπηση θέματος"
+  en: "Theme preview"
+  es: "Vista previa del tema"
+  fi: "Teeman esikatselu"
+  fr: "Aperçu du thème"
+  hr: "Pregled teme"
+  hu: "Témaelőnézet"
   it: "Anteprima del tema"
+  nb: "Forhåndsvisning av tema"
+  nl: "Themavoorbeeld"
+  pl: "Podgląd motywu"
   pt: "Pré-visualização do tema"
+  ro: "Previzualizare temă"
+  ru: "Предпросмотр темы"
+  sk: "Ukážka motívu"
+  sl: "Predogled teme"
+  st: "Pontšo ya sehlooho"
+  sv: "Temaförhandsgranskning"
+  uk: "Попередній перегляд теми"
+  xh: "Ukujonga kwangaphambili umxholo"
+  zu: "Ukubuka kuqala isihloko"
 
 themes.sample.emphasis_etc:
-  en: "Some *emphasis*, **strong text**, `inline code` and a [link](https://example.com)."
-  fr: "Du texte en *italique*, du **texte en gras**, du `code en ligne` et un [lien](https://example.com)."
-  es: "Un poco de *énfasis*, **texto en negrita**, `código en línea` y un [enlace](https://example.com)."
+  ca: "Una mica d'*èmfasi*, **text en negreta**, `codi en línia` i un [enllaç](https://example.com)."
+  cs: "Nějaký *důraz*, **tučný text**, `vložený kód` a [odkaz](https://example.com)."
+  cy: "Peth *pwyslais*, **testun trwm**, `cod mewnol` ac [odolen](https://example.com)."
+  da: "Noget *fremhævning*, **fed tekst**, `indlejret kode` og et [link](https://example.com)."
   de: "Etwas *Betonung*, **fetter Text**, `Inline-Code` und ein [Link](https://example.com)."
+  el: "Λίγη *έμφαση*, **έντονο κείμενο**, `ενσωματωμένος κώδικας` και ένας [σύνδεσμος](https://example.com)."
+  en: "Some *emphasis*, **strong text**, `inline code` and a [link](https://example.com)."
+  es: "Un poco de *énfasis*, **texto en negrita**, `código en línea` y un [enlace](https://example.com)."
+  fi: "Hieman *korostusta*, **lihavoitua tekstiä**, `rivinsisäistä koodia` ja [linkki](https://example.com)."
+  fr: "Du texte en *italique*, du **texte en gras**, du `code en ligne` et un [lien](https://example.com)."
+  hr: "Malo *naglaska*, **podebljan tekst**, `umetnuti kod` i [poveznica](https://example.com)."
+  hu: "Némi *kiemelés*, **félkövér szöveg**, `beágyazott kód` és egy [hivatkozás](https://example.com)."
   it: "Un po' di *enfasi*, **testo in grassetto**, `codice inline` e un [link](https://example.com)."
+  nb: "Litt *utheving*, **fet tekst**, `inline-kode` og en [lenke](https://example.com)."
+  nl: "Wat *nadruk*, **vetgedrukte tekst**, `inline code` en een [link](https://example.com)."
+  pl: "Trochę *wyróżnienia*, **pogrubionego tekstu**, `kodu w linii` i [odnośnik](https://example.com)."
   pt: "Alguma *ênfase*, **texto em negrito**, `código em linha` e uma [ligação](https://example.com)."
+  ro: "Puțină *accentuare*, **text aldin**, `cod inline` și un [link](https://example.com)."
+  ru: "Немного *курсива*, **жирного текста**, `встроенного кода` и [ссылка](https://example.com)."
+  sk: "Trochu *zvýraznenia*, **tučný text**, `vložený kód` a [odkaz](https://example.com)."
+  sl: "Nekaj *poudarka*, **krepkega besedila**, `vrstične kode` in [povezava](https://example.com)."
+  st: "Ho hatisa *ho hatisitsoeng*, **mongolo o matla**, `khoutu e kenyelelitsoeng` le [khokahanyo](https://example.com)."
+  sv: "Lite *kursivering*, **fetstil**, `infogad kod` och en [länk](https://example.com)."
+  uk: "Трохи *курсиву*, **жирного тексту**, `вбудованого коду` і [посилання](https://example.com)."
+  xh: "Uthando *oluhambisene*, **umbhalo oqinileyo**, `ikhowudi engaphakathi` kunye [nekhonkco](https://example.com)."
+  zu: "Okuncane *kokugcizelela*, **umbhalo oqinile**, `ikhodi engaphakathi` kanye [nesixhumanisi](https://example.com)."
 
 themes.sample.bare_code_fence:
-  en: "A bare code fence (no info string):\nPlain text highlighting."
-  fr: "Une clôture de code nue (sans chaîne d'info) :\nMise en évidence en texte brut."
-  es: "Un bloque de código simple (sin cadena de información):\nResaltado de texto sin formato."
+  ca: "Una tanca de codi nua (sense cadena d'informació):\nRealçat de text sense format."
+  cs: "Holý blok kódu (bez identifikátoru jazyka):\nZvýraznění prostého textu."
+  cy: "Ffens god noeth (dim llinyn gwybodaeth):\nAmlygu testun plaen."
+  da: "Et bart kodehegn (ingen infostreng):\nFremhævning af almindelig tekst."
   de: "Ein einfacher Codeblock (ohne Info-String):\nHervorhebung von Klartext."
+  el: "Ένα απλό μπλοκ κώδικα (χωρίς συμβολοσειρά πληροφοριών):\nΕπισήμανση απλού κειμένου."
+  en: "A bare code fence (no info string):\nPlain text highlighting."
+  es: "Un bloque de código simple (sin cadena de información):\nResaltado de texto sin formato."
+  fi: "Paljas koodilohko (ei info-merkkijonoa):\nPelkän tekstin korostus."
+  fr: "Une clôture de code nue (sans chaîne d'info) :\nMise en évidence en texte brut."
+  hr: "Goli blok koda (bez info niza):\nIsticanje običnog teksta."
+  hu: "Egyszerű kódblokk (info string nélkül):\nSima szöveg kiemelése."
   it: "Un blocco di codice semplice (senza stringa info):\nEvidenziazione del testo semplice."
+  nb: "Et bart kodeblokk-gjerde (ingen infostreng):\nUthevning av ren tekst."
+  nl: "Een kale codeblok-afbakening (geen info-string):\nMarkering van platte tekst."
+  pl: "Goły blok kodu (bez ciągu informacyjnego):\nPodświetlanie zwykłego tekstu."
   pt: "Uma vedação de código simples (sem cadeia de informação):\nRealce de texto simples."
+  ro: "Un bloc de cod simplu (fără șir de informații):\nEvidențiere text simplu."
+  ru: "Пустой блок кода (без строки информации):\nПодсветка обычного текста."
+  sk: "Holý blok kódu (bez info reťazca):\nZvýrazňovanie obyčajného textu."
+  sl: "Gola koda (brez informacijskega niza):\nPoudarjanje navadnega besedila."
+  st: "Lebota la khoutu le hlobotseng (ha ho na info string):\nHo hlahisa mongolo o tlwaelehileng."
+  sv: "Ett naket kodblock (ingen info-sträng):\nMarkering av vanlig text."
+  uk: "Порожній блок коду (без рядка інформації):\nПідсвічування звичайного тексту."
+  xh: "Umda wekhowudi onqabileyo (akukho info string):\nUkugqabaza umbhalo ongekho sese."
+  zu: "Uthango lwekhodi olunqunu (alukho uchungechunge lolwazi):\nUkugqamisa umbhalo ongelona iphrinti."
 
 
 help.window_title:
@@ -1354,6 +1716,15 @@ help.text:
     | Pos1 / Cmd-Hoch | Zum Anfang des Dokuments springen (Fn-Links auf Mac) |
     | Ende / Cmd-Runter | Zum Ende des Dokuments springen (Fn-Rechts auf Mac) |
 
+    ### Konfiguration
+    Beim Speichern von Designs im Fenster „Designs" wird am folgenden Ort eine Konfigurationsdatei erstellt oder aktualisiert:
+    | Plattform | Speicherort |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    Die vorherige Datei wird mit der Erweiterung `yyyymmdd-HHMMss` gespeichert. Die Dateien sind klein: <= ~300 Byte.
+
     ### Hilfe
     | Taste | Aktion |
     |---|---|
@@ -1407,6 +1778,15 @@ help.text:
     | Début / Cmd-Haut | Aller au début du document (Fn-Gauche sur Mac) |
     | Fin / Cmd-Bas | Aller à la fin du document (Fn-Droite sur Mac) |
 
+    ### Configuration
+    L'enregistrement des thèmes depuis la fenêtre Thèmes créera ou mettra à jour un fichier de configuration à l'emplacement suivant :
+    | Plateforme | Emplacement |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    L'ancien fichier sera enregistré avec l'extension `yyyymmdd-HHMMss`. Les fichiers sont de petite taille : <= ~300 octets.
+
     ### Aide
     | Touche | Action |
     |---|---|
@@ -1458,6 +1838,15 @@ help.text:
     | Re Pág / Av Pág | Desplazar un viewport (Fn-Arriba / Fn-Abajo en Mac) |
     | Inicio / Cmd-Arriba | Ir al principio del documento (Fn-Izquierda en Mac) |
     | Fin / Cmd-Abajo | Ir al final del documento (Fn-Derecha en Mac) |
+
+    ### Configuración
+    Guardar temas desde la ventana Temas creará o actualizará un archivo de configuración en la siguiente ubicación:
+    | Plataforma | Ubicación |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    El archivo anterior se guardará con la extensión `yyyymmdd-HHMMss`. Los archivos son pequeños: <= ~300 bytes.
 
     ### Ayuda
     | Tecla | Acción |
@@ -1512,6 +1901,14 @@ help.text:
     | Home / Cmd-Cima | Ir ao início do documento (Fn-Esquerda no Mac) |
     | End / Cmd-Baixo | Ir ao final do documento (Fn-Direita no Mac) |
 
+    ### Configuração
+    Guardar temas a partir da janela Temas irá criar ou atualizar um ficheiro de configuração na seguinte localização:
+    | Plataforma | Localização |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    O ficheiro anterior será guardado com a extensão `yyyymmdd-HHMMss`. Os ficheiros são pequenos: <= ~300 bytes.
     ### Ajuda
     | Tecla | Ação |
     |---|---|
@@ -1564,6 +1961,15 @@ help.text:
     | Page Up / Page Down | Rulla en visningsruta (Fn-Upp / Fn-Ned på Mac) |
     | Home / Cmd-Upp | Hoppa till dokumentets början (Fn-Vänster på Mac) |
     | End / Cmd-Ned | Hoppa till dokumentets slut (Fn-Höger på Mac) |
+
+    ### Konfiguration
+    Att spara teman från fönstret Teman skapar eller uppdaterar en konfigurationsfil på följande plats:
+    | Plattform | Plats |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    Den tidigare filen sparas med filändelsen `yyyymmdd-HHMMss`. Filerna är små: <= ~300 byte.
 
     ### Hjälp
     | Tangent | Åtgärd |
@@ -1618,6 +2024,15 @@ help.text:
     | Inizio / Cmd-Su | Vai all'inizio del documento (Fn-Sinistra su Mac) |
     | Fine / Cmd-Giù | Vai alla fine del documento (Fn-Destra su Mac) |
 
+    ### Configurazione
+    Il salvataggio dei temi dalla finestra Temi creerà o aggiornerà un file di configurazione nella posizione seguente:
+    | Piattaforma | Posizione |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    Il file precedente verrà salvato con l'estensione `yyyymmdd-HHMMss`. I file sono piccoli: <= ~300 byte.
+
     ### Aiuto
     | Tasto | Azione |
     |---|---|
@@ -1669,6 +2084,15 @@ help.text:
     | Page Up / Page Down | Przewiń o jeden widok (Fn-Góra / Fn-Dół na Mac) |
     | Home / Cmd-Góra | Przejdź na początek dokumentu (Fn-Lewo na Mac) |
     | End / Cmd-Dół | Przejdź na koniec dokumentu (Fn-Prawo na Mac) |
+
+    ### Konfiguracja
+    Zapisanie motywów z okna Motywy utworzy lub zaktualizuje plik konfiguracyjny w następującej lokalizacji:
+    | Platforma | Lokalizacja |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    Poprzedni plik zostanie zapisany z rozszerzeniem `yyyymmdd-HHMMss`. Pliki są małe: <= ~300 bajtów.
 
     ### Pomoc
     | Klawisz | Akcja |
@@ -1723,6 +2147,15 @@ help.text:
     | Home / Cmd-Nahoru | Přejít na začátek dokumentu (Fn-Vlevo na Mac) |
     | End / Cmd-Dolů | Přejít na konec dokumentu (Fn-Vpravo na Mac) |
 
+    ### Konfigurace
+    Uložení motivů z okna Motivy vytvoří nebo aktualizuje konfigurační soubor na následujícím místě:
+    | Platforma | Umístění |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    Předchozí soubor bude uložen s příponou `yyyymmdd-HHMMss`. Soubory jsou malé: <= ~300 bajtů.
+
     ### Nápověda
     | Klávesa | Akce |
     |---|---|
@@ -1775,6 +2208,15 @@ help.text:
     | Page Up / Page Down | Прокрутить на один экран (Fn-Вверх / Fn-Вниз на Mac) |
     | Home / Cmd-Вверх | Перейти в начало документа (Fn-Влево на Mac) |
     | End / Cmd-Вниз | Перейти в конец документа (Fn-Вправо на Mac) |
+
+    ### Конфигурация
+    Сохранение тем из окна Темы создаст или обновит файл конфигурации в следующем расположении:
+    | Платформа | Расположение |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    Предыдущий файл будет сохранён с расширением `yyyymmdd-HHMMss`. Файлы небольшие: <= ~300 байт.
 
     ### Помощь
     | Клавиша | Действие |
@@ -1829,6 +2271,14 @@ help.text:
     | Home / Cmd-Phezulu | Yiya ekuqaleni kwedokhumenti (Fn-Kwesokunxele ku-Mac) |
     | End / Cmd-Phansi | Yiya ekupheleni kwedokhumenti (Fn-Kwesokudla ku-Mac) |
 
+    ### Umlungiselelo
+    Ukulondoloza izihloko kusuka kwifasitela Izihloko kuzodala noma kubuyekeze ifayela lomlungiselelo kule ndawo elandelayo:
+    | Inkundla | Indawo |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    Ifayela langaphambilini lizolondolozwa ngesandiso `yyyymmdd-HHMMss`. Amafayela mancane: <= ~300 bytes.
     ### Usizo
     | Ikhiye | Isenzo |
     |---|---|
@@ -1881,6 +2331,15 @@ help.text:
     | Page Up / Page Down | Potolohisa seboni se le seng (Fn-Holimo / Fn-Tlase Mac) |
     | Home / Cmd-Holimo | Ea qalong ea tokomane (Fn-Nngele Mac) |
     | End / Cmd-Tlase | Ea pheletsong ea tokomane (Fn-Nngele ea Nngele Mac) |
+
+    ### Peakanyo
+    Ho boloka dihlooho ho tswa fensetereng ya Dihlooho ho tla theha kapa ho ntlafatsa faele ya peakanyo sebakeng se latelang:
+    | Platform | Sebaka |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    Faele ya pele e tla bolokwa ka kgokahanyo ya `yyyymmdd-HHMMss`. Difaele ke tse nyane: <= ~300 bytes.
 
     ### Thuso
     | Sehlooho | Ketso |
@@ -1935,6 +2394,15 @@ help.text:
     | Home / Cmd-Phezulu | Yiya ekuqaleni kwedokhumenti (Fn-Ekhohlo ku-Mac) |
     | End / Cmd-Ezantsi | Yiya ekupheleni kwedokhumenti (Fn-Ekunene ku-Mac) |
 
+    ### Umsesane
+    Ukugcina imixholo kwifestile yeMixholo kuya kudala okanye kuhlaziye ifayile yomsesane kule ndawo ilandelayo:
+    | Iqonga | Indawo |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    Ifayile yangaphambili iya kugcinwa ngesongezelelo `yyyymmdd-HHMMss`. Iifayile zincinci: <= ~300 bytes.
+
     ### Uncedo
     | Isitshixo | Isenzo |
     |---|---|
@@ -1987,6 +2455,15 @@ help.text:
     | Page Up / Page Down | Één viewport scrollen (Fn-Omhoog / Fn-Omlaag op Mac) |
     | Home / Cmd-Omhoog | Naar het begin van het document (Fn-Links op Mac) |
     | End / Cmd-Omlaag | Naar het einde van het document (Fn-Rechts op Mac) |
+
+    ### Configuratie
+    Het opslaan van thema's vanuit het Thema's-venster maakt of werkt een configuratiebestand bij op de volgende locatie:
+    | Platform | Locatie |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    Het vorige bestand wordt opgeslagen met de extensie `yyyymmdd-HHMMss`. De bestanden zijn klein: <= ~300 bytes.
 
     ### Help
     | Toets | Actie |
@@ -2041,6 +2518,15 @@ help.text:
     | Home / Cmd-Opp | Hopp til toppen av dokumentet (Fn-Venstre på Mac) |
     | End / Cmd-Ned | Hopp til bunnen av dokumentet (Fn-Høyre på Mac) |
 
+    ### Konfigurasjon
+    Å lagre temaer fra Temaer-vinduet vil opprette eller oppdatere en konfigurasjonsfil på følgende sted:
+    | Plattform | Sted |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    Den forrige filen lagres med filtypen `yyyymmdd-HHMMss`. Filene er små: <= ~300 byte.
+
     ### Hjelp
     | Tast | Handling |
     |---|---|
@@ -2093,6 +2579,15 @@ help.text:
     | Page Up / Page Down | Rul ét visningsvindue (Fn-Op / Fn-Ned på Mac) |
     | Home / Cmd-Op | Hop til toppen af dokumentet (Fn-Venstre på Mac) |
     | End / Cmd-Ned | Hop til bunden af dokumentet (Fn-Højre på Mac) |
+
+    ### Konfiguration
+    At gemme temaer fra temavinduet vil oprette eller opdatere en konfigurationsfil på følgende placering:
+    | Platform | Placering |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    Den tidligere fil gemmes med endelsen `yyyymmdd-HHMMss`. Filerne er små: <= ~300 bytes.
 
     ### Hjælp
     | Tast | Handling |
@@ -2147,6 +2642,15 @@ help.text:
     | Home / Cmd-Ylös | Hyppää asiakirjan alkuun (Fn-Vasen Macilla) |
     | End / Cmd-Alas | Hyppää asiakirjan loppuun (Fn-Oikea Macilla) |
 
+    ### Asetukset
+    Teemojen tallentaminen Teemat-ikkunasta luo tai päivittää asetustiedoston seuraavaan sijaintiin:
+    | Alusta | Sijainti |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    Aiempi tiedosto tallennetaan päätteellä `yyyymmdd-HHMMss`. Tiedostot ovat pieniä: <= ~300 tavua.
+
     ### Ohje
     | Näppäin | Toiminto |
     |---|---|
@@ -2199,6 +2703,15 @@ help.text:
     | Page Up / Page Down | Sgrolio un porth gweld (Fn-Lan / Fn-Lawr ar Mac) |
     | Home / Cmd-Lan | Neidio i dop y ddogfen (Fn-Chwith ar Mac) |
     | End / Cmd-Lawr | Neidio i waelod y ddogfen (Fn-De ar Mac) |
+
+    ### Ffurfweddiad
+    Bydd cadw themâu o'r ffenestr Themâu yn creu neu'n diweddaru ffeil ffurfweddiad yn y lleoliad canlynol:
+    | Platfform | Lleoliad |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    Bydd y ffeil flaenorol yn cael ei chadw gyda'r estyniad `yyyymmdd-HHMMss`. Mae'r ffeiliau'n fach: <= ~300 beit.
 
     ### Cymorth
     | Bysell | Gweithred |
@@ -2253,6 +2766,15 @@ help.text:
     | Inici / Cmd-Amunt | Salta al principi del document (Fn-Esquerra al Mac) |
     | Final / Cmd-Avall | Salta al final del document (Fn-Dreta al Mac) |
 
+    ### Configuració
+      Desar temes des de la finestra Temes crearà o actualitzarà un fitxer de configuració a la ubicació següent:
+      | Plataforma | Ubicació |
+      |---|---|
+      | Linux/Mac | $HOME/.config/workman/config.toml |
+      | Windows | $APPDATA\.config\workman\config.toml |
+
+      El fitxer anterior es desarà amb l'extensió `yyyymmdd-HHMMss`. Els fitxers són petits: <= ~300 bytes.
+
     ### Ajuda
     | Tecla | Acció |
     |---|---|
@@ -2305,6 +2827,15 @@ help.text:
     | Page Up / Page Down | Derulați un viewport (Fn-Sus / Fn-Jos pe Mac) |
     | Home / Cmd-Sus | Salt la începutul documentului (Fn-Stânga pe Mac) |
     | End / Cmd-Jos | Salt la sfârșitul documentului (Fn-Dreapta pe Mac) |
+
+    ### Configurație
+    Salvarea temelor din fereastra Teme va crea sau actualiza un fișier de configurare în următoarea locație:
+    | Platformă | Locație |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    Fișierul anterior va fi salvat cu extensia `yyyymmdd-HHMMss`. Fișierele sunt mici: <= ~300 octeți.
 
     ### Ajutor
     | Tastă | Acțiune |
@@ -2359,6 +2890,15 @@ help.text:
     | Home / Cmd-Fel | Ugrás a dokumentum elejére (Fn-Bal Mac-en) |
     | End / Cmd-Le | Ugrás a dokumentum végére (Fn-Jobb Mac-en) |
 
+    ### Konfiguráció
+    A témák mentése a Témák ablakból létrehoz vagy frissít egy konfigurációs fájlt a következő helyen:
+    | Platform | Hely |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    Az előző fájl a(z) `yyyymmdd-HHMMss` kiterjesztéssel kerül mentésre. A fájlok kicsik: <= ~300 bájt.
+
     ### Súgó
     | Billentyű | Művelet |
     |---|---|
@@ -2411,6 +2951,15 @@ help.text:
     | Page Up / Page Down | Posunúť o jedno zobrazenie (Fn-Hore / Fn-Dole na Mac) |
     | Home / Cmd-Hore | Prejsť na začiatok dokumentu (Fn-Vľavo na Mac) |
     | End / Cmd-Dole | Prejsť na koniec dokumentu (Fn-Vpravo na Mac) |
+
+    ### Konfigurácia
+    Uloženie motívov z okna Motívy vytvorí alebo aktualizuje konfiguračný súbor na nasledujúcom mieste:
+    | Platforma | Umiestnenie |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    Predchádzajúci súbor bude uložený s príponou `yyyymmdd-HHMMss`. Súbory sú malé: <= ~300 bajtov.
 
     ### Pomocník
     | Kláves | Akcia |
@@ -2465,6 +3014,15 @@ help.text:
     | Home / Cmd-Gore | Skoči na početak dokumenta (Fn-Lijevo na Mac) |
     | End / Cmd-Dolje | Skoči na kraj dokumenta (Fn-Desno na Mac) |
 
+    ### Konfiguracija
+    Spremanje tema iz prozora Teme stvorit će ili ažurirati konfiguracijsku datoteku na sljedećoj lokaciji:
+    | Platforma | Lokacija |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    Prethodna datoteka bit će spremljena s nastavkom `yyyymmdd-HHMMss`. Datoteke su male: <= ~300 bajtova.
+
     ### Pomoć
     | Tipka | Radnja |
     |---|---|
@@ -2518,6 +3076,15 @@ help.text:
     | Home / Cmd-Gor | Skoči na začetek dokumenta (Fn-Levo na Mac) |
     | End / Cmd-Dol | Skoči na konec dokumenta (Fn-Desno na Mac) |
 
+    ### Konfiguracija
+    Shranjevanje tem iz okna Teme bo ustvarilo ali posodobilo konfiguracijsko datoteko na naslednji lokaciji:
+    | Platforma | Lokacija |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    Prejšnja datoteka bo shranjena s pripono `yyyymmdd-HHMMss`. Datoteke so majhne: <= ~300 bajtov.
+
     ### Pomoč
     | Tipka | Dejanje |
     |---|---|
@@ -2570,6 +3137,15 @@ help.text:
     | Page Up / Page Down | Прокрутити на один екран (Fn-Вгору / Fn-Вниз на Mac) |
     | Home / Cmd-Вгору | Перейти на початок документа (Fn-Вліво на Mac) |
     | End / Cmd-Вниз | Перейти в кінець документа (Fn-Вправо на Mac) |
+
+    ### Конфігурація
+    Збереження тем із вікна Теми створить або оновить файл конфігурації за таким розташуванням:
+    | Платформа | Розташування |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    Попередній файл буде збережено з розширенням `yyyymmdd-HHMMss`. Файли невеликі: <= ~300 байт.
 
     ### Довідка
     | Клавіша | Дія |
@@ -2676,6 +3252,15 @@ help.text:
     | Page Up / Page Down | Κύλιση μίας οθόνης (Fn-Πάνω / Fn-Κάτω σε Mac) |
     | Home / Cmd-Πάνω | Μετάβαση στην αρχή του εγγράφου (Fn-Αριστερά σε Mac) |
     | End / Cmd-Κάτω | Μετάβαση στο τέλος του εγγράφου (Fn-Δεξιά σε Mac) |
+
+    ### Διαμόρφωση
+    Η αποθήκευση θεμάτων από το παράθυρο Θέματα θα δημιουργήσει ή θα ενημερώσει ένα αρχείο διαμόρφωσης στην ακόλουθη τοποθεσία:
+    | Πλατφόρμα | Τοποθεσία |
+    |---|---|
+    | Linux/Mac | $HOME/.config/workman/config.toml |
+    | Windows | $APPDATA\.config\workman\config.toml |
+
+    Το προηγούμενο αρχείο θα αποθηκευτεί με την επέκταση `yyyymmdd-HHMMss`. Τα αρχεία είναι μικρά: <= ~300 bytes.
 
     ### Βοήθεια
     | Πλήκτρο | Ενέργεια |
