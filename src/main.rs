@@ -225,10 +225,6 @@ fn parse_base16_yaml(src: &str, fallback_name: &str) -> Result<Base16, String> {
 // ---------------------------------------------------------------------------
 
 const SAMPLE_MD: &str = r#"
-# Theme preview
-
-Some *emphasis*, **strong text**, `inline code` and a [link](https://example.com).
-
 ```rust
 fn main() {
     let name = "world";
@@ -249,11 +245,6 @@ serde = { version = "1", features = ["derive"] }
 Get-ChildItem -Path . -Recurse |
     Where-Object { $_.Length -gt 1MB } |
     Sort-Object Length -Descending
-```
-
-```
-A bare code fence (no info string):
-Plain text highlighting.
 ```
 "#;
 
@@ -832,7 +823,6 @@ fn main() -> eframe::Result<()> {
     // Set the UI locale from the operating system before any translatable string is used.
     let locale = detect_locale();
     rust_i18n::set_locale(&locale);
-    // dbg!(&locale);
 
     // Strip internal markers before processing positional arguments.
     let args: Vec<String> = env::args().filter(|a| !a.starts_with('-')).collect();
@@ -1912,7 +1902,7 @@ impl MarkdownApp {
     fn theme_button(&mut self, ui: &mut egui::Ui) {
         if ui
             .selectable_label(self.theme_window_open, "🎨")
-            .on_hover_text("Themes…")
+            .on_hover_text(format!("{}…", t!("themes.title")))
             .clicked()
         {
             self.theme_window_open = !self.theme_window_open;
@@ -1940,47 +1930,51 @@ impl MarkdownApp {
         let mut base16_path: Option<PathBuf> = None;
         let mut tm_theme_path: Option<PathBuf> = None;
 
-        egui::Window::new("Themes")
-            .open(&mut open) // gives the title-bar close button
+        egui::Window::new(t!("themes.title"))
+            .open(&mut open)
             .collapsible(false)
-            .resizable(true)
-            .default_size([420.0, 500.0])
-            // Start near the top-right so the main document stays visible; still draggable.
-            .default_pos(ctx.content_rect().right_top() + egui::vec2(-440.0, 24.0))
+            .auto_sized()
+            // .anchor(egui::Align2::RIGHT_TOP, egui::vec2(-16.0, 24.0))
+            .pivot(egui::Align2::RIGHT_TOP) // Measures position from the window's top-right corner
+            .default_pos(ctx.content_rect().right_top() + egui::vec2(-24.0, 24.0))
             .show(ctx, |ui| {
+                ui.set_max_width(500.0);
                 let dark_mode = ui.visuals().dark_mode;
 
                 // --- Controls ---------------------------------------------
                 ui.horizontal(|ui| {
-                    ui.label("Main theme:");
+                    ui.label(t!("themes.main.load_label"));
                     self.theme_picker(ui);
                     if ui
-                        .button("📂 Load…")
-                        .on_hover_text("Load a Base16 YAML theme file")
-                        .clicked() {
+                        .button(t!("themes.load_button"))
+                        .on_hover_text(t!("themes.main.load_tip"))
+                        .clicked()
+                    {
                         let (maybe_base16_path, maybe_name) = self.load_base16_file();
                         if let Some(name) = maybe_name {
-                                base16_path = maybe_base16_path;
-                                self.apply_theme(ui, name);
-                            }
-                        if let Some(err) = &self.base16_load_error {
-                            ui.colored_label(ui.visuals().error_fg_color, err);
+                            base16_path = maybe_base16_path;
+                            self.apply_theme(ui, name);
                         }
+                    }
+
+                    if let Some(err) = &self.base16_load_error {
+                        ui.add_space(4.0); // Clean spacing
+                        ui.colored_label(ui.visuals().error_fg_color, err);
                     }
                 });
 
                 ui.horizontal(|ui| {
-                    ui.label("Code themes:");
-                    let which = if dark_mode { "dark" } else { "light" };
+                    ui.label(t!("themes.code.label"));
+                    let which = if dark_mode { t!("themes.code.radio_dark") } else { t!("themes.code.radio_light") };
                     ui.radio_value(
                         &mut self.tm_theme_filter,
                         TmThemeFilter::Matching,
-                        format!("Only {which}"),
+                        format!("{which}"),
                     );
-                    ui.radio_value(&mut self.tm_theme_filter, TmThemeFilter::All, "All");
+                    ui.radio_value(&mut self.tm_theme_filter, TmThemeFilter::All, t!("themes.code.radio_all"));
                     if ui
-                        .button("📂 Load…")
-                        .on_hover_text("Load a .tmTheme file")
+                        .button(t!("themes.load_button"))
+                        .on_hover_text(t!("themes.code.load_tip"))
                         .clicked()
                     {
                         let (maybe_tm_path, maybe_name) = self.load_tm_theme_file(dark_mode);
@@ -1994,6 +1988,7 @@ impl MarkdownApp {
                         }
                         tm_theme_path = maybe_tm_path;
                     }
+
                     if let Some(err) = &self.tm_load_error {
                         ui.colored_label(ui.visuals().error_fg_color, err);
                     }
@@ -2020,9 +2015,9 @@ impl MarkdownApp {
 
                 ui.horizontal(|ui| {
                     ui.label(if dark_mode {
-                        "Dark code theme:"
+                        t!("themes.code.label.dark_mode")
                     } else {
-                        "Light code theme:"
+                        t!("themes.code.label.light_mode")
                     });
                     egui::ComboBox::from_id_salt("syntect_theme")
                         .selected_text(slot.unwrap_or("(default)"))
@@ -2047,11 +2042,11 @@ impl MarkdownApp {
 
                 let mut save_error: Option<String> = None;
                 ui.horizontal(|ui| {
-                    ui.label("Save as default:");
+                    ui.label(t!("themes.save_label"));
                     let path = RealContext::new().get_config_path();
                     if ui
-                        .button("Save")
-                        .on_hover_text("Save configuration")
+                        .button(t!("themes.save_button"))
+                        .on_hover_text(t!("themes.save_tip"))
                         .clicked()
                     {
                         match config::maybe_config() {
@@ -2098,31 +2093,36 @@ impl MarkdownApp {
                             None => eprintln!("Failed to retrieve configuration"),
                         }
                     }
+
                     if let Some (err) = save_error {
                         ui.colored_label(ui.visuals().error_fg_color, err);
                     } else if self.last_save.is_some_and(|t| t.elapsed() < Duration::from_secs(3)) {
                         // ui.label(&format!("Saved to {}",path.display()));
-                        ui.label("Saved");
+                        ui.label(t!("themes.saved"));
                     }
                 });
 
                 ui.separator();
 
                 // --- Sample markdown --------------------------------------
-                ScrollArea::vertical()
-                    .id_salt("sample markdown")
-                    .auto_shrink([false, false])
-                    .show(ui, |ui| {
-                        CommonMarkViewer::new()
-                            .syntax_theme_dark(
-                                self.tm_theme_dark.unwrap_or(DEFAULT_SYNTECT_THEME_DARK),
-                            )
-                            .syntax_theme_light(
-                                self.tm_theme_light.unwrap_or(DEFAULT_SYNTECT_THEME_LIGHT),
-                            )
-                            .show(ui, &mut self.sample_cache, SAMPLE_MD);
-                    });
-            });
+                let sample_md = format!(r"# {}
+{}
+{}
+
+```
+{}
+```
+", t!("themes.sample.preview"), t!("themes.sample.emphasis_etc"), SAMPLE_MD,  t!("themes.sample.bare_code_fence"));
+
+                CommonMarkViewer::new()
+                    .syntax_theme_dark(
+                        self.tm_theme_dark.unwrap_or(DEFAULT_SYNTECT_THEME_DARK),
+                    )
+                    .syntax_theme_light(
+                        self.tm_theme_light.unwrap_or(DEFAULT_SYNTECT_THEME_LIGHT),
+                    )
+                    .show(ui, &mut self.sample_cache, &sample_md);
+        });
 
         self.theme_window_open = open;
     }

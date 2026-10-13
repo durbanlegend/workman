@@ -1068,6 +1068,151 @@ toc.title:
   xh: "Okuqukethiweyo"
   zu: "Okuqukethwe"
 
+themes.title:
+  en: "Themes"
+  fr: "Thèmes"
+  es: "Temas"
+  de: "Designs"
+  it: "Temi"
+  pt: "Temas"
+
+themes.main.load_label:
+  en: "Main theme:"
+  fr: "Thème principal :"
+  es: "Tema principal:"
+  de: "Haupt-Design:"
+  it: "Tema principale:"
+  pt: "Tema principal:"
+
+themes.load_button:
+  en: "📂 Load…"
+  fr: "📂 Charger…"
+  es: "📂 Cargar…"
+  de: "📂 Laden…"
+  it: "📂 Carica…"
+  pt: "📂 Carregar…"
+
+themes.main.load_tip:
+  en: "Load a Base16 YAML theme file"
+  fr: "Charger un fichier de thème Base16 YAML"
+  es: "Cargar un archivo de tema Base16 YAML"
+  de: "Base16-YAML-Designdatei laden"
+  it: "Carica un file di tema Base16 YAML"
+  pt: "Carregar um ficheiro de tema Base16 YAML"
+
+themes.code.label:
+  en: "Code themes:"
+  fr: "Thèmes de code :"
+  es: "Temas de código:"
+  de: "Code-Designs:"
+  it: "Temi del codice:"
+  pt: "Temas de código:"
+
+themes.code.radio_dark:
+  en: "Only dark"
+  fr: "Sombre uniquement"
+  es: "Solo oscuro"
+  de: "Nur dunkel"
+  it: "Solo scuro"
+  pt: "Apenas escuro"
+
+themes.code.radio_light:
+  en: "Only light"
+  fr: "Clair uniquement"
+  es: "Solo claro"
+  de: "Nur hell"
+  it: "Solo chiaro"
+  pt: "Apenas claro"
+
+themes.code.radio_all:
+  en: "All"
+  fr: "Tous"
+  es: "Todos"
+  de: "Alle"
+  it: "Tutti"
+  pt: "Todos"
+
+themes.code.load_tip:
+  en: "Load a .tmTheme file"
+  fr: "Charger un fichier .tmTheme"
+  es: "Cargar un archivo .tmTheme"
+  de: ".tmTheme-Datei laden"
+  it: "Carica un file .tmTheme"
+  pt: "Carregar um ficheiro .tmTheme"
+
+themes.code.label.dark_mode:
+  en: "Dark code theme:"
+  fr: "Thème de code sombre :"
+  es: "Tema de código oscuro:"
+  de: "Dunkles Code-Design:"
+  it: "Tema del codice scuro:"
+  pt: "Tema de código escuro:"
+
+themes.code.label.light_mode:
+  en: "Light code theme:"
+  fr: "Thème de code clair :"
+  es: "Tema de código claro:"
+  de: "Helles Code-Design:"
+  it: "Tema del codice chiaro:"
+  pt: "Tema de código claro:"
+
+themes.save_label:
+  en: "Save as default:"
+  fr: "Enregistrer par défaut :"
+  es: "Guardar como predeterminado:"
+  de: "Als Standard speichern:"
+  it: "Salva come predefinito:"
+  pt: "Guardar como predefinição:"
+
+themes.save_button:
+  en: "Save:"
+  fr: "Enregistrer :"
+  es: "Guardar:"
+  de: "Speichern:"
+  it: "Salva:"
+  pt: "Guardar:"
+
+themes.save_tip:
+  en: "Save configuration:"
+  fr: "Enregistrer la configuration :"
+  es: "Guardar configuración:"
+  de: "Konfiguration speichern:"
+  it: "Salva configurazione:"
+  pt: "Guardar configuração:"
+
+themes.saved:
+  en: "Configuration saved"
+  fr: "Configuration enregistrée"
+  es: "Configuración guardada"
+  de: "Konfiguration gespeichert"
+  it: "Configurazione salvata"
+  pt: "Configuração guardada"
+
+themes.sample.preview:
+  en: "Theme preview"
+  fr: "Aperçu du thème"
+  es: "Vista previa del tema"
+  de: "Design-Vorschau"
+  it: "Anteprima del tema"
+  pt: "Pré-visualização do tema"
+
+themes.sample.emphasis_etc:
+  en: "Some *emphasis*, **strong text**, `inline code` and a [link](https://example.com)."
+  fr: "Du texte en *italique*, du **texte en gras**, du `code en ligne` et un [lien](https://example.com)."
+  es: "Un poco de *énfasis*, **texto en negrita**, `código en línea` y un [enlace](https://example.com)."
+  de: "Etwas *Betonung*, **fetter Text**, `Inline-Code` und ein [Link](https://example.com)."
+  it: "Un po' di *enfasi*, **testo in grassetto**, `codice inline` e un [link](https://example.com)."
+  pt: "Alguma *ênfase*, **texto em negrito**, `código em linha` e uma [ligação](https://example.com)."
+
+themes.sample.bare_code_fence:
+  en: "A bare code fence (no info string):\nPlain text highlighting."
+  fr: "Une clôture de code nue (sans chaîne d'info) :\nMise en évidence en texte brut."
+  es: "Un bloque de código simple (sin cadena de información):\nResaltado de texto sin formato."
+  de: "Ein einfacher Codeblock (ohne Info-String):\nHervorhebung von Klartext."
+  it: "Un blocco di codice semplice (senza stringa info):\nEvidenziazione del testo semplice."
+  pt: "Uma vedação de código simples (sem cadeia de informação):\nRealce de texto simples."
+
+
 help.window_title:
   af: "Hulp"
   bg: "Помощ"
@@ -1154,7 +1299,7 @@ help.text:
     | Linux/Mac | $HOME/.config/workman/config.toml |
     | Windows | $APPDATA\.config\workman\config.toml |
 
-    The previous file will be saved with the extension `yyyymmdd-HHMMss`. The files are small: about 250 bytes.
+    The previous file will be saved with the extension `yyyymmdd-HHMMss`. The files are small: <= ~300 bytes.
 
     ### Help
     | Key | Action |

@@ -26,8 +26,8 @@ const DEFAULT_CONFIG: &str = include_str!("../assets/default_config.toml");
 pub struct Config {
     /// Theming
     pub theming: Theming,
-    /// Miscellaneous settings
-    pub misc: Misc,
+    // /// Miscellaneous settings
+    // pub misc: Misc,
 }
 
 /// Logging settings
@@ -181,9 +181,9 @@ impl Config {
     }
 }
 
-/// Miscellaneous configuration parameters
-#[derive(Clone, Debug, Default, Documented, DocumentedFields, Deserialize, Serialize)]
-pub struct Misc {}
+// /// Miscellaneous configuration parameters
+// #[derive(Clone, Debug, Default, Documented, DocumentedFields, Deserialize, Serialize)]
+// pub struct Misc {}
 
 /// Custom deserialisation method for booleans, to accept current true/false or legacy "true"/"false".
 #[expect(dead_code)]
