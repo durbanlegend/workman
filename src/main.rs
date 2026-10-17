@@ -145,7 +145,7 @@ fn yaml_scalar(v: &str) -> String {
     v.split(" #").next().unwrap_or("").trim().to_owned()
 }
 
-#[allow(clippy::cast_possible_truncation)]
+#[expect(clippy::cast_possible_truncation)]
 fn parse_hex(s: &str) -> Result<Color32, String> {
     let s = s.trim_start_matches('#');
     let bad = || format!("invalid colour {s:?}");
@@ -297,11 +297,7 @@ enum TmThemeFilter {
 ///
 /// Called once at startup and again whenever the toolbar "Contrast+/-" toggle changes.
 /// `image_loading_spinners` is kept `false` in both modes.
-#[allow(dead_code)]
 fn apply_style(ctx: &egui::Context, enhanced: bool) {
-    const BRIGHTEN: f32 = 1.3;
-    const DARKEN: f32 = 1.0 / BRIGHTEN;
-    // ── Dark mode ─────────────────────────────────────────────────────────────────────────
     ctx.global_style_mut(|style| {
         // Show the url of a hyperlink on hover
         style.url_in_tooltip = true;
@@ -311,7 +307,9 @@ fn apply_style(ctx: &egui::Context, enhanced: bool) {
         style.interaction.tooltip_grace_time = 3.0;
         // Optional: Show tooltips even if the mouse is still drifting
         // style.interaction.show_tooltips_only_when_still = false;
+        style.spacing.scroll.kinetic.rubber_band = false;
     });
+    // ── Dark mode ─────────────────────────────────────────────────────────────────────────
     ctx.set_visuals_of(egui::Theme::Dark, {
         let mut v = egui::Visuals::dark();
         if enhanced {
@@ -356,7 +354,7 @@ fn apply_style(ctx: &egui::Context, enhanced: bool) {
 use egui::ecolor::Hsva;
 
 /// Adjusts a Color32 by a given factor (e.g., 1.2 for +20% brightness).
-#[allow(dead_code)]
+#[expect(dead_code)]
 fn adjust_color(color: Color32, factor: f32) -> Color32 {
     let mut hsva = Hsva::from(color);
     // Scale the Value (brightness) component, keeping it clamped between 0.0 and 1.0
@@ -401,7 +399,7 @@ fn slugify(text: &str) -> String {
 /// Parses an ATX heading line and returns `(level, plain_text)`.
 /// `plain_text` is the heading content with any trailing `{…}` attribute block stripped.
 /// Returns `None` for non-heading lines, indented lines, or malformed ATX syntax.
-#[allow(clippy::cast_possible_truncation)]
+#[expect(clippy::cast_possible_truncation)]
 fn parse_heading_line(line: &str) -> Option<(u8, &str)> {
     let hashes = line.bytes().take_while(|&b| b == b'#').count();
     if hashes == 0 || hashes > 6 {
@@ -1239,7 +1237,7 @@ impl ThemeConfig {
 }
 
 /// The state holder for our egui app.
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 struct MarkdownApp {
     /// Processed markdown text currently loaded (image paths absolutized, heading IDs injected).
     content: String,
@@ -1316,7 +1314,7 @@ struct MarkdownApp {
 }
 
 impl MarkdownApp {
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     fn new(
         content: String,
         raw_content: String,
@@ -1910,7 +1908,7 @@ impl MarkdownApp {
     }
 
     /// Call once per frame (e.g. at the end of `update`). Draws nothing if closed.
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     fn theme_window(&mut self, ctx: &egui::Context) {
         if !self.theme_window_open {
             return;
@@ -1938,6 +1936,8 @@ impl MarkdownApp {
             .pivot(egui::Align2::RIGHT_TOP) // Measures position from the window's top-right corner
             .default_pos(ctx.content_rect().right_top() + egui::vec2(-24.0, 24.0))
             .show(ctx, |ui| {
+                ui.style_mut().url_in_tooltip = true;
+
                 ui.set_max_width(500.0);
                 let dark_mode = ui.visuals().dark_mode;
 
@@ -2505,6 +2505,8 @@ impl eframe::App for MarkdownApp {
             self.remove_search(id);
         }
 
+        ui.style_mut().url_in_tooltip = true;
+
         // ── Top panel: toolbar ────────────────────────────────────────────────────────────
         egui::Panel::top("toolbar").show(ui, |ui| {
             ui.horizontal(|ui| {
@@ -2903,6 +2905,7 @@ impl eframe::App for MarkdownApp {
                 .resizable(true)
                 .default_size(220.0)
                 .show(ui, |ui| {
+                    ui.style_mut().spacing.scroll.kinetic.rubber_band = false;
                     ui.add_space(4.0);
                     ui.strong(t!("toc.title").to_string());
                     ui.separator();
@@ -3231,4 +3234,5 @@ fn customise_scrollbar(ui: &mut egui::Ui) {
     scroll.dormant_handle_opacity = 0.15;
     scroll.interact_handle_opacity = 0.55;
     scroll.active_handle_opacity = 0.80;
+    scroll.kinetic.rubber_band = false;
 }

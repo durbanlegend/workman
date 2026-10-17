@@ -253,7 +253,7 @@ impl Context for RealContext {
 }
 
 /// Initializes and returns the configuration.
-#[allow(clippy::module_name_repetitions)]
+#[expect(clippy::module_name_repetitions)]
 pub fn maybe_config() -> Option<Config> {
     lazy_static_var!(Option<Config>, {
         let context = RealContext::new();
@@ -337,7 +337,6 @@ pub fn load(context: &Arc<dyn Context>) -> ConfigResult<Option<Config>> {
 /// Will return `Err` if there is an error editing the file.
 /// # Panics
 /// Will panic if it can't create the parent directory for the configuration.
-#[allow(clippy::unnecessary_wraps)]
 pub fn open(context: &dyn Context) -> ConfigResult<Option<String>> {
     let config_path = context.get_config_path();
     eprintln!("config_path={}", config_path.display());
@@ -385,7 +384,7 @@ pub fn validate_config_format(content: &str) -> ConfigResult<()> {
     // // Check for common mistakes
     // if let Some(table) = doc.get("theming").and_then(|v| v.as_table()) {
     //     for (key, value) in table {
-    //         #[allow(clippy::single_match)]
+    //         #[expect(clippy::single_match)]
     //         match key {
     //             "default_theme" => {
     //                 if let Some(v) = value.as_str()

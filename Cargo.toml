@@ -25,13 +25,13 @@ authors = ["Don Forbes <don.forbes3@gmail.com>"]
 
 [workspace.dependencies]
 # Define external crates used throughout your workspace here
-eframe = { version = "0.36", features = ["wgpu"] }
+eframe = { version = "0.37", features = ["wgpu"] }
 quote = "1.0"
 serde_yaml = "0.9"
 syn = { version = "3.0", features = ["full"] }
 
 [package.metadata.i18n]
-available-locales = ["af", "bg", "ca", "cs", "cy", "da", "de", "el", "en", "es", "fi", "fr", "hr", "hu", "it", "nb", "nl", "no", "pl", "pt", "ro", "ru", "sk", "sl", "st", "sv", "uk", "xh", "zu"]
+available-locales = ["af", "bg", "ca", "cs", "cy", "da", "de", "el", "en", "es", "fi", "fr", "hr", "hu", "it", "nb", "nl", "pl", "pt", "ro", "ru", "sk", "sl", "st", "sv", "uk", "xh", "zu"]
 default-locale = "en"
 load-path = "locales"
 
@@ -45,12 +45,10 @@ chrono = "0.4"
 dirs = "7"
 documented = "0.10"
 edit = "0.1"
-eframe = { version = "0.36", features = ["wgpu"] }
+eframe = { version = "0.37", features = ["wgpu"] }
 ego-tree = "0.11.0"
-# NOTE: a git dependency prevents publishing to crates.io. Switch to a crates.io
-# release of egui_commonmark once it contains the required changes.
-egui_commonmark = { git = "https://github.com/lampsitter/egui_commonmark", rev = "f3fce134", features = ["better_syntax_highlighting", "svg", "fetch"] }
-egui_extras = { version = "0.36", features = ["svg", "syntect"] }
+egui_commonmark = { version = "0.26", features = ["better_syntax_highlighting", "svg", "fetch"] }
+egui_extras = { version = "0.37", features = ["svg", "syntect"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 fontdb = { version = "0.23", features = ["fs"] }
 log = "0.4"

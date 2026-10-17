@@ -21,7 +21,7 @@
 //!       .render_html_fn(Some(&move |ui, chunk| html.render(ui, chunk)))
 //!       .show(ui, &mut self.cache, &self.markdown);
 
-use eframe::egui;
+use eframe::egui::{self, IdSalt};
 use egui::{CursorIcon, Id, Label, OpenUrl, RichText, Sense, TextStyle, Ui};
 use scraper::node::Element;
 use scraper::{ElementRef, Html, Node};
@@ -41,7 +41,7 @@ const VOID: &[&str] = &[
 /// `egui_commonmark`'s `RenderHtmlFn` is `dyn Fn(..) + 'static`, so the closure
 /// passed to `render_html_fn` must own (a clone of) the renderer rather than
 /// borrow it from the app.
-#[allow(clippy::too_long_first_doc_paragraph)]
+#[expect(clippy::too_long_first_doc_paragraph)]
 #[derive(Clone)]
 pub struct HtmlRenderer {
     /// Prefix for relative image paths, e.g. "<file:///home/me/docs>".
@@ -118,7 +118,7 @@ impl HtmlRenderer {
 // Block layer
 // ---------------------------------------------------------------------------
 
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 #[derive(Clone, Default)]
 struct Style {
     bold: bool,
@@ -299,7 +299,7 @@ fn render_block(ui: &mut Ui, node: N, st: &Style, cx: &HtmlRenderer, centered: b
                 .filter(|t| !t.is_empty())
                 .unwrap_or_else(|| "Details".to_owned());
             // Stable id so open/closed state survives across frames.
-            let id = Id::new(("html_details", node_key(node)));
+            let id = IdSalt::new(("html_details", node_key(node)));
             egui::CollapsingHeader::new(title)
                 .id_salt(id)
                 .default_open(el.attr("open").is_some())
@@ -383,7 +383,7 @@ fn render_table(ui: &mut Ui, node: N, st: &Style, cx: &HtmlRenderer) {
         }
     }
 
-    let id = Id::new(("html_table", node_key(node)));
+    let id = IdSalt::new(("html_table", node_key(node)));
     egui::Frame::new()
         .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
         .corner_radius(3.0)
@@ -450,7 +450,7 @@ fn flush_run(ui: &mut Ui, run: &mut Vec<N>, st: &Style, cx: &HtmlRenderer, cente
             }
         };
         if centered {
-            let id = ui.id().with((key, i));
+            let id = ui.scope_id().with((key, i));
             centered_row(ui, id, draw);
         } else {
             ui.horizontal_wrapped(draw);
@@ -458,7 +458,7 @@ fn flush_run(ui: &mut Ui, run: &mut Vec<N>, st: &Style, cx: &HtmlRenderer, cente
     }
 }
 
-#[allow(clippy::assigning_clones)]
+#[expect(clippy::assigning_clones)]
 fn render_inline(ui: &mut Ui, node: N, style: &Style, cx: &HtmlRenderer, at_start: &mut bool) {
     match node.value() {
         Node::Text(t) => {
