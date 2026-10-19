@@ -24,7 +24,7 @@ use std::{
 };
 use syntect::highlighting::{Color, ThemeSet};
 use thag_common::{auto_help, help_system::check_help_and_exit};
-use workman::config::{self, Context, RealContext};
+use workman::config::{self, Config, Context, RealContext, maybe_config};
 
 /// A fast lightweight multi-lingual GUI markdown viewer.
 ///
@@ -870,8 +870,9 @@ fn main() -> eframe::Result<()> {
     let (maybe_theme_name, maybe_base16_built_in, maybe_base_16_loaded) =
         resolve_base16_theme(config.as_ref());
 
-    let tm_theme_dark_name =
-        config::maybe_config().and_then(|config| config.theming.default_tm_theme_dark);
+    let tm_theme_dark_name = config
+        .as_ref()
+        .and_then(|config| config.theming.default_tm_theme_dark.clone());
     let tm_theme_dark_content = tm_theme_dark_name.as_ref().and_then(|theme_dark_name| {
         retrieve_config_tm_theme(config.as_ref(), theme_dark_name, BUILT_IN_TM_THEME_DIR)
     });
@@ -881,8 +882,9 @@ fn main() -> eframe::Result<()> {
         true,
     );
 
-    let tm_theme_light_name =
-        config::maybe_config().and_then(|config| config.theming.default_tm_theme_light);
+    let tm_theme_light_name = config
+        .as_ref()
+        .and_then(|config| config.theming.default_tm_theme_light.clone());
     let tm_theme_light_content = tm_theme_light_name.as_ref().and_then(|theme_light_name| {
         retrieve_config_tm_theme(config.as_ref(), theme_light_name, BUILT_IN_TM_THEME_DIR)
     });
@@ -984,7 +986,7 @@ fn resolve_tm_name(
 }
 
 fn resolve_base16_theme(
-    config: Option<&config::Config>,
+    config: Option<&Config>,
 ) -> (Option<&'static str>, Option<&Base16>, Option<Base16>) {
     let config_default_theme = config
         .as_ref()
@@ -1134,7 +1136,7 @@ fn init_with_content(
 
 // Retrieve from config directory if any
 fn retrieve_config_tm_theme(
-    config: Option<&config::Config>,
+    config: Option<&Config>,
     tm_theme_name: &str,
     built_in_tm_theme_dir: &str,
 ) -> Option<String> {
@@ -1165,7 +1167,7 @@ fn retrieve_config_tm_theme(
 
 // Retrieve from config directory if any
 fn retrieve_config_theme(
-    config: Option<&config::Config>,
+    config: Option<&Config>,
     theme_name: &str,
     built_in_theme_dir: &str,
 ) -> Option<Base16> {
@@ -1174,7 +1176,8 @@ fn retrieve_config_theme(
         let mut path: Option<PathBuf> = None;
         'outer: for &dir in &[base16_dir, built_in_theme_dir] {
             for ext in &["yaml", "yml"] {
-                let try_path = PathBuf::from(String::from(dir)).join(theme_name.to_owned() + ext);
+                let try_path =
+                    PathBuf::from(String::from(dir)).join(theme_name.to_owned() + "." + ext);
                 eprintln!("Try {}", try_path.display());
                 if try_path.exists() {
                     path = Some(try_path);
@@ -1307,7 +1310,7 @@ struct MarkdownApp {
     base16_filter: Base16Filter,   // Default => All
     base16_load_error: Option<String>,
     tm_load_error: Option<String>,
-    // config: Option<Config>,
+    config: Option<Config>,
     // config_theme: Option<&'static str>,
     /// When set, a brief "saved" notice is shown next to the save button.
     last_save: Option<Instant>,
@@ -1391,8 +1394,7 @@ impl MarkdownApp {
             base16_load_error: None,
             tm_load_error: None,
             last_save: None,
-            // config,
-            // config_theme,
+            config: maybe_config(),
         };
         // eprintln!("CWD={}", std::env::current_dir().unwrap().display());
         if let Some(base_16_loaded) = theme_config.maybe_base16_loaded {
@@ -1408,9 +1410,13 @@ impl MarkdownApp {
                 .cache
                 .add_syntax_theme_from_bytes(tm_theme_dark, theme_dark_content.as_bytes())
             {
-                Ok(()) => eprintln!("Added syntax theme from bytes with name {tm_theme_dark}"),
+                Ok(()) => {
+                    eprintln!("Added syntax theme to cache from bytes with name {tm_theme_dark}")
+                }
                 Err(_) => {
-                    eprintln!("Failed to add syntax theme from bytes with name {tm_theme_dark}");
+                    eprintln!(
+                        "Failed to add syntax theme to cache from bytes with name {tm_theme_dark}"
+                    );
                 }
             }
 
@@ -1418,9 +1424,13 @@ impl MarkdownApp {
                 .sample_cache
                 .add_syntax_theme_from_bytes(tm_theme_dark, theme_dark_content.as_bytes())
             {
-                Ok(()) => eprintln!("Added syntax theme from bytes with name {tm_theme_dark}"),
+                Ok(()) => eprintln!(
+                    "Added syntax theme to sample_cache from bytes with name {tm_theme_dark}"
+                ),
                 Err(_) => {
-                    eprintln!("Failed to add syntax theme from bytes with name {tm_theme_dark}");
+                    eprintln!(
+                        "Failed to add syntax theme to sample_cache from bytes with name {tm_theme_dark}"
+                    );
                 }
             }
         }
@@ -1925,8 +1935,6 @@ impl MarkdownApp {
 
         // `.open()` needs `&mut bool`; use a local to avoid borrowing `self`.
         let mut open = true;
-        let mut base16_path: Option<PathBuf> = None;
-        let mut tm_theme_path: Option<PathBuf> = None;
 
         egui::Window::new(t!("themes.title"))
             .open(&mut open)
@@ -1952,8 +1960,13 @@ impl MarkdownApp {
                     {
                         let (maybe_base16_path, maybe_name) = self.load_base16_file();
                         if let Some(name) = maybe_name {
-                            base16_path = maybe_base16_path;
                             self.apply_theme(ui, name);
+                            let mut config = self.config.take();
+                            if let Some(ref mut config) = config {
+                                config.theming.base16_dir = maybe_base16_path.as_ref().map(|path| path.parent().unwrap().to_string_lossy().to_string());
+                                config.theming.default_theme = maybe_base16_path.as_ref().map(|path| path.file_stem().unwrap().to_string_lossy().to_string());
+                            }
+                            self.config = config;
                         }
                     }
 
@@ -1981,12 +1994,23 @@ impl MarkdownApp {
                         eprintln!(
                             "self.load_tm_theme_file({dark_mode})=({maybe_tm_path:?}, {maybe_name:?})"
                         );
+                        if maybe_name.is_some() {
+                            let mut config = self.config.take();
+                            if let Some(ref mut config) = config {
+                                config.theming.tm_theme_dir = maybe_tm_path.as_ref().map(|path| path.parent().unwrap().to_string_lossy().to_string());
+                                if dark_mode {
+                                    config.theming.default_tm_theme_dark = maybe_tm_path.as_ref().map(|path| path.file_stem().unwrap().to_string_lossy().to_string());
+                                } else {
+                                    config.theming.default_tm_theme_light = maybe_tm_path.as_ref().map(|path| path.file_stem().unwrap().to_string_lossy().to_string());
+                                }
+                            }
+                            self.config = config;
+                        }
                         if dark_mode {
                             self.tm_theme_dark = maybe_name;
                         } else {
                             self.tm_theme_light = maybe_name;
                         }
-                        tm_theme_path = maybe_tm_path;
                     }
 
                     if let Some(err) = &self.tm_load_error {
@@ -2049,15 +2073,8 @@ impl MarkdownApp {
                         .on_hover_text(t!("themes.save_tip"))
                         .clicked()
                     {
-                        match config::maybe_config() {
-                            Some(mut config) => {
-                                config.theming = config::Theming::new(
-                                    self.current_theme.map(String::from),
-                                    config.theming.base16_dir.or_else(|| base16_path.map(|path| path.to_string_lossy().to_string())),
-                                    self.tm_theme_dark.map(String::from),
-                                    self.tm_theme_light.map(String::from),
-                                    config.theming.tm_theme_dir.or_else(|| tm_theme_path.map(|path| path.to_string_lossy().to_string())),
-                                );
+                        match &self.config {
+                            Some(config) => {
 
                                 // Format the time as yyyymmdd-HHMMss
                                 let formatted_time = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
@@ -2131,7 +2148,7 @@ impl MarkdownApp {
     fn load_base16_file(&mut self) -> (Option<PathBuf>, Option<&'static str>) {
         let Some(path) = rfd::FileDialog::new()
             .set_directory(
-                config::maybe_config()
+                self.config
                     .as_ref()
                     .and_then(|config| config.theming.base16_dir.clone())
                     .unwrap_or_default(),
@@ -2183,7 +2200,7 @@ impl MarkdownApp {
     fn load_tm_theme_file(&mut self, dark_mode: bool) -> (Option<PathBuf>, Option<&'static str>) {
         let Some(path) = rfd::FileDialog::new()
             .set_directory(
-                config::maybe_config()
+                self.config
                     .as_ref()
                     .and_then(|config| config.theming.tm_theme_dir.clone())
                     .unwrap_or_default(),
@@ -2703,7 +2720,7 @@ impl eframe::App for MarkdownApp {
                     let cmd_opt: String = format!("{MOD}-{ALT}");
 
                     if ui
-                        .button("🇽")
+                        .button("X")
                         .on_hover_text(t!("toolbar.close", cmd = cmd_opt).to_string())
                         .clicked()
                     {

@@ -1659,7 +1659,7 @@ help.text:
     | Platform | Location |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     The previous file will be saved with the extension `yyyymmdd-HHMMss`. The files are small: <= ~300 bytes.
 
@@ -1721,7 +1721,7 @@ help.text:
     | Plattform | Speicherort |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     Die vorherige Datei wird mit der Erweiterung `yyyymmdd-HHMMss` gespeichert. Die Dateien sind klein: <= ~300 Byte.
 
@@ -1783,7 +1783,7 @@ help.text:
     | Plateforme | Emplacement |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     L'ancien fichier sera enregistré avec l'extension `yyyymmdd-HHMMss`. Les fichiers sont de petite taille : <= ~300 octets.
 
@@ -1844,7 +1844,7 @@ help.text:
     | Plataforma | Ubicación |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     El archivo anterior se guardará con la extensión `yyyymmdd-HHMMss`. Los archivos son pequeños: <= ~300 bytes.
 
@@ -1906,7 +1906,7 @@ help.text:
     | Plataforma | Localização |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     O ficheiro anterior será guardado com a extensão `yyyymmdd-HHMMss`. Os ficheiros são pequenos: <= ~300 bytes.
     ### Ajuda
@@ -1967,7 +1967,7 @@ help.text:
     | Plattform | Plats |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     Den tidigare filen sparas med filändelsen `yyyymmdd-HHMMss`. Filerna är små: <= ~300 byte.
 
@@ -2029,7 +2029,7 @@ help.text:
     | Piattaforma | Posizione |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     Il file precedente verrà salvato con l'estensione `yyyymmdd-HHMMss`. I file sono piccoli: <= ~300 byte.
 
@@ -2090,7 +2090,7 @@ help.text:
     | Platforma | Lokalizacja |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     Poprzedni plik zostanie zapisany z rozszerzeniem `yyyymmdd-HHMMss`. Pliki są małe: <= ~300 bajtów.
 
@@ -2152,7 +2152,7 @@ help.text:
     | Platforma | Umístění |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     Předchozí soubor bude uložen s příponou `yyyymmdd-HHMMss`. Soubory jsou malé: <= ~300 bajtů.
 
@@ -2214,7 +2214,7 @@ help.text:
     | Платформа | Расположение |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     Предыдущий файл будет сохранён с расширением `yyyymmdd-HHMMss`. Файлы небольшие: <= ~300 байт.
 
@@ -2276,7 +2276,7 @@ help.text:
     | Inkundla | Indawo |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     Ifayela langaphambilini lizolondolozwa ngesandiso `yyyymmdd-HHMMss`. Amafayela mancane: <= ~300 bytes.
     ### Usizo
@@ -2337,7 +2337,7 @@ help.text:
     | Platform | Sebaka |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     Faele ya pele e tla bolokwa ka kgokahanyo ya `yyyymmdd-HHMMss`. Difaele ke tse nyane: <= ~300 bytes.
 
@@ -2399,7 +2399,7 @@ help.text:
     | Iqonga | Indawo |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     Ifayile yangaphambili iya kugcinwa ngesongezelelo `yyyymmdd-HHMMss`. Iifayile zincinci: <= ~300 bytes.
 
@@ -2461,7 +2461,7 @@ help.text:
     | Platform | Locatie |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     Het vorige bestand wordt opgeslagen met de extensie `yyyymmdd-HHMMss`. De bestanden zijn klein: <= ~300 bytes.
 
@@ -2523,7 +2523,7 @@ help.text:
     | Plattform | Sted |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     Den forrige filen lagres med filtypen `yyyymmdd-HHMMss`. Filene er små: <= ~300 byte.
 
@@ -2585,7 +2585,7 @@ help.text:
     | Platform | Placering |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     Den tidligere fil gemmes med endelsen `yyyymmdd-HHMMss`. Filerne er små: <= ~300 bytes.
 
@@ -2647,7 +2647,7 @@ help.text:
     | Alusta | Sijainti |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     Aiempi tiedosto tallennetaan päätteellä `yyyymmdd-HHMMss`. Tiedostot ovat pieniä: <= ~300 tavua.
 
@@ -2709,7 +2709,7 @@ help.text:
     | Platfform | Lleoliad |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     Bydd y ffeil flaenorol yn cael ei chadw gyda'r estyniad `yyyymmdd-HHMMss`. Mae'r ffeiliau'n fach: <= ~300 beit.
 
@@ -2771,7 +2771,7 @@ help.text:
       | Plataforma | Ubicació |
       |---|---|
       | Linux/Mac | $HOME/.config/workman/config.toml |
-      | Windows | $APPDATA\.config\workman\config.toml |
+      | Windows | $APPDATA\\.config\workman\config.toml |
 
       El fitxer anterior es desarà amb l'extensió `yyyymmdd-HHMMss`. Els fitxers són petits: <= ~300 bytes.
 
@@ -2833,7 +2833,7 @@ help.text:
     | Platformă | Locație |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     Fișierul anterior va fi salvat cu extensia `yyyymmdd-HHMMss`. Fișierele sunt mici: <= ~300 octeți.
 
@@ -2895,7 +2895,7 @@ help.text:
     | Platform | Hely |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     Az előző fájl a(z) `yyyymmdd-HHMMss` kiterjesztéssel kerül mentésre. A fájlok kicsik: <= ~300 bájt.
 
@@ -2957,7 +2957,7 @@ help.text:
     | Platforma | Umiestnenie |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     Predchádzajúci súbor bude uložený s príponou `yyyymmdd-HHMMss`. Súbory sú malé: <= ~300 bajtov.
 
@@ -3019,7 +3019,7 @@ help.text:
     | Platforma | Lokacija |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     Prethodna datoteka bit će spremljena s nastavkom `yyyymmdd-HHMMss`. Datoteke su male: <= ~300 bajtova.
 
@@ -3081,7 +3081,7 @@ help.text:
     | Platforma | Lokacija |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     Prejšnja datoteka bo shranjena s pripono `yyyymmdd-HHMMss`. Datoteke so majhne: <= ~300 bajtov.
 
@@ -3143,7 +3143,7 @@ help.text:
     | Платформа | Розташування |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     Попередній файл буде збережено з розширенням `yyyymmdd-HHMMss`. Файли невеликі: <= ~300 байт.
 
@@ -3258,7 +3258,7 @@ help.text:
     | Πλατφόρμα | Τοποθεσία |
     |---|---|
     | Linux/Mac | $HOME/.config/workman/config.toml |
-    | Windows | $APPDATA\.config\workman\config.toml |
+    | Windows | $APPDATA\\.config\workman\config.toml |
 
     Το προηγούμενο αρχείο θα αποθηκευτεί με την επέκταση `yyyymmdd-HHMMss`. Τα αρχεία είναι μικρά: <= ~300 bytes.
 
