@@ -1057,6 +1057,30 @@ fn install_fonts() -> egui::FontDefinitions {
         .get_mut(&egui::FontFamily::Proportional)
         .unwrap()
         .push(monospace_font.to_owned());
+
+    // Do the same for symbol
+    let symbol_font = "NotoSansSymbols2";
+    fonts.font_data.insert(
+        symbol_font.to_owned(),
+        egui::FontData::from_static(include_bytes!(
+            "../assets/fonts/NotoSansSymbols2-Regular.ttf"
+        ))
+        .into(),
+    );
+
+    // Add it to end of monospace list as a fallback
+    fonts
+        .families
+        .get_mut(&egui::FontFamily::Monospace)
+        .unwrap()
+        .push(symbol_font.to_owned());
+
+    // Add it to end of proportional list as a fallback, in the first instance for copy icon in code blocks for egui 0.37 tofu error
+    fonts
+        .families
+        .get_mut(&egui::FontFamily::Proportional)
+        .unwrap()
+        .push(symbol_font.to_owned());
     fonts
 }
 
