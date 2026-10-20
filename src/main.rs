@@ -1435,7 +1435,7 @@ impl MarkdownApp {
                 .add_syntax_theme_from_bytes(tm_theme_dark, theme_dark_content.as_bytes())
             {
                 Ok(()) => {
-                    eprintln!("Added syntax theme to cache from bytes with name {tm_theme_dark}")
+                    eprintln!("Added syntax theme to cache from bytes with name {tm_theme_dark}");
                 }
                 Err(_) => {
                     eprintln!(
@@ -1470,10 +1470,12 @@ impl MarkdownApp {
                 .add_syntax_theme_from_bytes(tm_theme_light, theme_light_content.as_bytes())
             {
                 Ok(()) => {
-                    eprintln!("Added syntax theme from bytes with name {tm_theme_light}");
+                    eprintln!("Added syntax theme to cache from bytes with name {tm_theme_light}");
                 }
                 Err(_) => {
-                    eprintln!("Failed to add syntax theme from bytes with name {tm_theme_light}");
+                    eprintln!(
+                        "Failed to add syntax theme to cache from bytes with name {tm_theme_light}"
+                    );
                 }
             }
             match app
@@ -1481,10 +1483,12 @@ impl MarkdownApp {
                 .add_syntax_theme_from_bytes(tm_theme_light, theme_light_content.as_bytes())
             {
                 Ok(()) => {
-                    eprintln!("Added syntax theme from bytes with name {tm_theme_light}");
+                    eprintln!(
+                        "Added syntax theme to sample_cache from bytes with name {tm_theme_light}"
+                    );
                 }
                 Err(e) => eprintln!(
-                    "Error {e} attempting to add syntax theme from bytes with name {tm_theme_light}"
+                    "Error {e} attempting to add syntax theme to sample_cache from bytes with name {tm_theme_light}"
                 ),
             }
         }
