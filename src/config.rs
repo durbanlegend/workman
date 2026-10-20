@@ -12,7 +12,7 @@ use std::{
     fmt::Debug,
     fs,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 // use strum::{Display, EnumString};
 use toml::Value;
@@ -252,33 +252,58 @@ impl Context for RealContext {
     }
 }
 
+/// Message describing why the user's config file could not be used, if that happened.
+static CONFIG_ERROR: OnceLock<String> = OnceLock::new();
+
 /// Initializes and returns the configuration.
+///
+/// Returns `None` if there is a config file that could not be read or parsed. In that case the
+/// application carries on with its built-in defaults, and the reason is available from
+/// [`config_error`] so that the UI can tell the user. (This used to terminate the process,
+/// which, for a GUI relaunched with its stdio detached, meant the window silently never appeared.)
 #[expect(clippy::module_name_repetitions)]
 pub fn maybe_config() -> Option<Config> {
     lazy_static_var!(Option<Config>, {
-        let context = RealContext::new();
-        let load_or_default = Config::load_or_create_default(&context);
-        load_or_default.map_or_else(|_| maybe_load_config(), Some)
+        let (config, error) = resolve_config(&RealContext::new());
+        if let Some(error) = error {
+            eprintln!("workman: {error}");
+            let _ = CONFIG_ERROR.set(error);
+        }
+        config
     })
     .clone()
 }
 
-fn maybe_load_config() -> Option<Config> {
-    // eprintln!("In maybe_load_config, should not see this message more than once");
+/// The reason the user's config file was ignored, if it was. Only meaningful after
+/// [`maybe_config`] has been called.
+#[must_use]
+pub fn config_error() -> Option<&'static str> {
+    CONFIG_ERROR.get().map(String::as_str)
+}
 
-    let context = get_context();
-
-    match load(&context) {
-        Ok(Some(config)) => Some(config),
-        Ok(None) => {
-            eprintln!("No config file found - this is allowed");
-            None
+/// Loads (creating if necessary) the configuration for `context`.
+///
+/// Returns the configuration to use plus, if the user's file was present but unusable,
+/// a description of the problem. An unusable file yields `None` rather than defaults so
+/// that nothing downstream mistakes the defaults for the user's settings and overwrites
+/// the file. If the file doesn't exist and can't be created (e.g. a read-only home
+/// directory), the defaults are used and there is no error.
+fn resolve_config(context: &impl Context) -> (Option<Config>, Option<String>) {
+    match Config::load_or_create_default(context) {
+        Ok(config) => (Some(config), None),
+        Err(e) if context.get_config_path().exists() => {
+            let path = context.get_config_path();
+            (
+                None,
+                Some(format!(
+                    "cannot use config file {}: {e}. Using built-in defaults.",
+                    path.display()
+                )),
+            )
         }
         Err(e) => {
-            println!("Failed to load config: {e}");
-            // sleep(Duration::from_secs(1));
-            // println!("Failed to load config: {e}");
-            std::process::exit(1);
+            eprintln!("workman: no config file and could not create one ({e}); using defaults");
+            (Some(Config::default()), None)
         }
     }
 }
@@ -415,5 +440,74 @@ fn main() {
         // eprintln!("Loaded config: {config:?}");
     } else {
         eprintln!("No configuration file found.");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug)]
+    struct TestContext(PathBuf);
+
+    impl Context for TestContext {
+        fn get_config_path(&self) -> PathBuf {
+            self.0.clone()
+        }
+        fn is_real(&self) -> bool {
+            false
+        }
+    }
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("workman-cfg-{}-{name}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn valid_config_is_used() {
+        let dir = temp_dir("valid");
+        let path = dir.join("config.toml");
+        fs::write(&path, "[theming]\ndefault_theme = \"foo\"\n").unwrap();
+        let (config, error) = resolve_config(&TestContext(path));
+        assert_eq!(config.unwrap().theming.default_theme.as_deref(), Some("foo"));
+        assert!(error.is_none());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn broken_config_is_reported_not_fatal_and_left_untouched() {
+        let dir = temp_dir("broken");
+        let path = dir.join("config.toml");
+        fs::write(&path, "[theming\nthis is not toml").unwrap();
+        let (config, error) = resolve_config(&TestContext(path.clone()));
+        assert!(config.is_none(), "no config must be assumed");
+        let error = error.expect("the problem must be reported");
+        assert!(error.contains("config.toml"), "{error}");
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            "[theming\nthis is not toml",
+            "the user's file must not be overwritten"
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn missing_config_is_created_from_the_default() {
+        let dir = temp_dir("missing");
+        let path = dir.join("sub").join("config.toml");
+        let (config, error) = resolve_config(&TestContext(path.clone()));
+        assert!(config.is_some());
+        assert!(error.is_none());
+        assert!(path.exists());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn config_without_theming_section_is_rejected() {
+        assert!(validate_config_format("foo = 1\n").is_err());
+        assert!(validate_config_format("[theming]\n").is_ok());
     }
 }

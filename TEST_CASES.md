@@ -4,7 +4,7 @@
 
 ## Image URL
 
-Note that no tooltip is rendered as this is not in scope.
+Note that no tooltip is rendered, as this is not in scope.
 
 ### Raw
 

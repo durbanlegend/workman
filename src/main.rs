@@ -514,6 +514,38 @@ fn extract_toc_and_inject_ids(raw: &str) -> (String, Vec<TocEntry>) {
     (out, toc)
 }
 
+/// Byte offset and slug of each TOC heading within `content` (the prepared markdown).
+///
+/// `toc` only contains the headings that `extract_toc_and_inject_ids` could parse as ATX
+/// headings; pulldown-cmark also reports setext headings and headings nested in block quotes
+/// or lists, whose span doesn't start at the `#`. Those must be skipped here too, using the
+/// same test, or every later heading would be paired with the wrong TOC entry.
+fn content_heading_positions(content: &str, toc: &[TocEntry]) -> Vec<(usize, String)> {
+    let opts = Options::ENABLE_TABLES
+        | Options::ENABLE_TASKLISTS
+        | Options::ENABLE_STRIKETHROUGH
+        | Options::ENABLE_FOOTNOTES
+        | Options::ENABLE_HEADING_ATTRIBUTES;
+    let mut entries = toc.iter();
+    let mut positions = Vec::with_capacity(toc.len());
+    for (event, span) in Parser::new_ext(content, opts).into_offset_iter() {
+        if !matches!(event, Event::Start(Tag::Heading { .. })) {
+            continue;
+        }
+        let line_end = content[span.start..]
+            .find('\n')
+            .map_or(content.len(), |p| span.start + p);
+        if parse_heading_line(&content[span.start..line_end]).is_none() {
+            continue;
+        }
+        match entries.next() {
+            Some(entry) => positions.push((span.start, entry.slug.clone())),
+            None => break,
+        }
+    }
+    positions
+}
+
 // ─── Image path absolutization ─────────────────────────────────────────────────
 
 /// Rewrites relative image paths in Markdown to absolute `file://` URIs so they
@@ -593,17 +625,44 @@ fn prepare_markdown(
     (absolutize_image_paths(&id_injected, base_dir), toc)
 }
 
+/// Builds a `file://` URI for `path`, percent-encoding anything that isn't safe in a URI
+/// (spaces, `#`, `%`, parentheses, non-ASCII, ...). `egui`'s file loader decodes these.
 fn path_to_file_uri(path: &Path) -> String {
-    let s = path.to_string_lossy().into_owned();
-    #[cfg(windows)]
-    {
-        let s = s.replace('\\', "/");
-    }
-    // Unix absolute paths start with `/`; Windows paths start with the drive letter.
-    if s.starts_with('/') {
-        format!("file://{s}") // file:// + /unix/path = file:///unix/path
+    file_uri_from_str(&path.to_string_lossy(), cfg!(windows))
+}
+
+/// Platform-independent core of [`path_to_file_uri`]; `windows` selects Windows path syntax
+/// so that it can be tested on any platform.
+fn file_uri_from_str(raw: &str, windows: bool) -> String {
+    let mut s = if windows {
+        raw.replace('\\', "/")
     } else {
-        format!("file:///{s}") // file:/// + C:/... = file:///C:/...
+        raw.to_owned()
+    };
+    if windows {
+        // `canonicalize()` yields verbatim paths: `\\?\C:\dir` and `\\?\UNC\server\share`.
+        if let Some(rest) = s.strip_prefix("//?/UNC/") {
+            s = format!("//{rest}");
+        } else if let Some(rest) = s.strip_prefix("//?/") {
+            s = rest.to_owned();
+        }
+    }
+
+    let mut encoded = String::with_capacity(s.len() + 16);
+    for &b in s.as_bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~' | b'/' | b':') {
+            encoded.push(char::from(b));
+        } else {
+            encoded.push_str(&format!("%{b:02X}"));
+        }
+    }
+
+    if encoded.starts_with("//") {
+        format!("file:{encoded}") // UNC: file://server/share/...
+    } else if encoded.starts_with('/') {
+        format!("file://{encoded}") // file:// + /unix/path = file:///unix/path
+    } else {
+        format!("file:///{encoded}") // file:/// + C:/... = file:///C:/...
     }
 }
 
@@ -822,20 +881,19 @@ fn main() -> eframe::Result<()> {
     let locale = detect_locale();
     rust_i18n::set_locale(&locale);
 
-    // Strip internal markers before processing positional arguments.
-    let args: Vec<String> = env::args().filter(|a| !a.starts_with('-')).collect();
-
-    if args.contains(&"--version".to_string()) || args.contains(&"-V".to_string()) {
-        eprintln!(
+    // Must look at the raw arguments: the positional filter below removes anything starting
+    // with '-'.
+    if env::args().skip(1).any(|a| a == "--version" || a == "-V") {
+        println!(
             "{} version {}",
-            PathBuf::from(&args[0])
-                .file_name()
-                .unwrap()
-                .to_string_lossy(),
+            env!("CARGO_PKG_NAME"),
             env!("CARGO_PKG_VERSION")
         );
         return Ok(());
     }
+
+    // Strip option flags before processing positional arguments.
+    let args: Vec<String> = env::args().filter(|a| !a.starts_with('-')).collect();
 
     let file_arg = resolve_file_arg(&args);
 
@@ -1104,7 +1162,49 @@ fn init_empty() -> impl FnOnce() -> (PathBuf, String, String, Vec<TocEntry>) {
     }
 }
 
+/// The page shown in place of a file larger than [`MAX_BYTES`].
 #[expect(clippy::cast_precision_loss)]
+fn file_too_large_content(path: &Path, size_bytes: u64) -> String {
+    let size_mb = size_bytes as f64 / 1e6;
+    format!(
+        "# \u{26a0} File Too Large\n\n\
+         Cannot render `{}`.\n\n\
+         **File size: {size_mb:.1} MB** \u{2014} exceeds the {:.0} MB limit.\n\n\
+         Rendering files this large would make the UI unresponsive.\n\
+         Consider splitting the file into smaller sections.",
+        path.display(),
+        MAX_BYTES as f64 / 1e6,
+    )
+}
+
+/// Reads a markdown file for display.
+///
+/// Files over [`MAX_BYTES`] are never read into memory: the size is checked from the file's
+/// metadata first, and the read itself is capped in case the file grows in the meantime. Such
+/// a file yields the "too large" page instead, so that the watcher can still notice a fix.
+/// Invalid UTF-8 is replaced rather than rejected, so that e.g. a Latin-1 file is still shown.
+fn read_markdown_file(path: &Path) -> std::io::Result<String> {
+    use std::io::Read;
+
+    let too_large = |size: u64| {
+        eprintln!("workman: file too large ({size} bytes): {}", path.display());
+        Ok(file_too_large_content(path, size))
+    };
+
+    let file = fs::File::open(path)?;
+    let len = file.metadata()?.len();
+    if len > MAX_BYTES as u64 {
+        return too_large(len);
+    }
+    let mut bytes = Vec::with_capacity(usize::try_from(len).unwrap_or(0));
+    file.take(MAX_BYTES as u64 + 1).read_to_end(&mut bytes)?;
+    if bytes.len() > MAX_BYTES {
+        return too_large(bytes.len() as u64);
+    }
+    Ok(String::from_utf8(bytes)
+        .unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned()))
+}
+
 fn init_with_content(
     search_collapsible: bool,
     file: &PathBuf,
@@ -1118,30 +1218,12 @@ fn init_with_content(
     // Keep CWD in sync for canonicalize() calls inside the viewer.
     let _ = env::set_current_dir(&initial_base_dir);
 
-    let raw_content = fs::read_to_string(&canonical_initial_path).unwrap_or_else(|_| {
+    let raw_content = read_markdown_file(&canonical_initial_path).unwrap_or_else(|e| {
         format!(
-            "# Error\nFailed to read `{}`.",
+            "# Error\nFailed to read `{}`: {e}.",
             canonical_initial_path.display()
         )
     });
-    let raw_content = if raw_content.len() > MAX_BYTES {
-        let size_mb = raw_content.len() as f64 / 1e6;
-        eprintln!(
-            "workman: file too large ({size_mb:.1} MB): {}",
-            canonical_initial_path.display()
-        );
-        format!(
-            "# ⚠ File Too Large\n\n\
-                  Cannot render `{}`.\n\n\
-                  **File size: {size_mb:.1} MB** — exceeds the {:.0} MB limit.\n\n\
-                  Rendering files this large would make the UI unresponsive.\n\
-                  Consider splitting the file into smaller sections.",
-            canonical_initial_path.display(),
-            MAX_BYTES as f64 / 1e6,
-        )
-    } else {
-        raw_content
-    };
     // Pre-screen for malformed code fences before any processing.
     let raw_content = match validate_code_fences(&raw_content) {
         Ok(()) => raw_content,
@@ -1585,80 +1667,45 @@ impl MarkdownApp {
 
     /// Load `path` from disk and update content, TOC, raw content, and CWD.
     /// Returns `true` on success. Re-arms the file watcher for the new path.
-    #[expect(clippy::cast_precision_loss)]
     fn load_file(&mut self, path: PathBuf) -> bool {
-        match fs::read_to_string(&path) {
-            Ok(raw) => {
-                // Hard size limit: refuse files that would make the UI unusable.
-                if raw.len() > MAX_BYTES {
-                    let size_mb = raw.len() as f64 / 1e6;
-                    let err = format!(
-                        "# ⚠ File Too Large\n\n\
-                         Cannot render `{}`.\n\n\
-                         **File size: {size_mb:.1} MB** — exceeds the {:.0} MB limit.\n\n\
-                         Rendering files this large would make the UI unresponsive.\n\
-                         Consider splitting the file into smaller sections.",
-                        path.display(),
-                        MAX_BYTES as f64 / 1e6,
-                    );
-                    eprintln!(
-                        "workman: file too large ({size_mb:.1} MB): {}",
-                        path.display()
-                    );
-                    // Still "load" the error page so the watcher can detect a fix.
-                    let base_dir = path
-                        .parent()
-                        .unwrap_or_else(|| Path::new("."))
-                        .to_path_buf();
-                    let _ = env::set_current_dir(&base_dir);
-                    let (id_injected, toc) = extract_toc_and_inject_ids(&err);
-                    self.content = absolutize_image_paths(&id_injected, &base_dir);
-                    self.raw_content = err;
-                    self.html = HtmlRenderer::new(path_to_file_uri(&path));
-                    self.current_file_path = path;
-                    self.toc = toc;
-                    self.cache = CommonMarkCache::default();
-                    add_code_block_themes(&mut self.cache);
-                    self.use_viewport_cache = self.content.len() >= VIEWPORT_CACHE_THRESHOLD;
-                    self.start_watching();
-                    self.build_content_headings();
-                    return true;
-                }
-                // Pre-screen for malformed code fences.
-                let raw = match validate_code_fences(&raw) {
-                    Ok(()) => raw,
-                    Err(ref fence_err) => {
-                        eprintln!("workman: {}", fence_err_brief(fence_err, &path));
-                        fence_error_content(&path, fence_err)
-                    }
-                };
-                let base_dir = path
-                    .parent()
-                    .unwrap_or_else(|| Path::new("."))
-                    .to_path_buf();
-                // Keep CWD in sync for future canonicalize() calls.
-                let _ = env::set_current_dir(&base_dir);
-                let (content, toc) = prepare_markdown(&raw, &base_dir, self.search_collapsible);
-                self.content = content;
-                self.raw_content = raw;
-                self.html = HtmlRenderer::new(path_to_file_uri(&path));
-                self.current_file_path = path;
-                self.toc = toc;
-                // Clear the cache so egui_commonmark doesn't carry over stale state.
-                self.cache = CommonMarkCache::default();
-                add_code_block_themes(&mut self.cache);
-                self.use_viewport_cache = self.content.len() >= VIEWPORT_CACHE_THRESHOLD;
-                // Re-arm the watcher for the (possibly different) new file.
-                self.start_watching();
-                // Build content-relative heading positions for accurate scroll navigation.
-                self.build_content_headings();
-                true
-            }
+        // Oversized files come back as a "too large" page, so they are "loaded" like any
+        // other and the watcher can detect a fix.
+        let raw = match read_markdown_file(&path) {
+            Ok(raw) => raw,
             Err(e) => {
                 eprintln!("Failed to read {}: {e}", path.display());
-                false
+                return false;
             }
-        }
+        };
+        // Pre-screen for malformed code fences.
+        let raw = match validate_code_fences(&raw) {
+            Ok(()) => raw,
+            Err(ref fence_err) => {
+                eprintln!("workman: {}", fence_err_brief(fence_err, &path));
+                fence_error_content(&path, fence_err)
+            }
+        };
+        let base_dir = path
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .to_path_buf();
+        // Keep CWD in sync for future canonicalize() calls.
+        let _ = env::set_current_dir(&base_dir);
+        let (content, toc) = prepare_markdown(&raw, &base_dir, self.search_collapsible);
+        self.content = content;
+        self.raw_content = raw;
+        self.html = HtmlRenderer::new(path_to_file_uri(&path));
+        self.current_file_path = path;
+        self.toc = toc;
+        // Clear the cache so egui_commonmark doesn't carry over stale state.
+        self.cache = CommonMarkCache::default();
+        add_code_block_themes(&mut self.cache);
+        self.use_viewport_cache = self.content.len() >= VIEWPORT_CACHE_THRESHOLD;
+        // Re-arm the watcher for the (possibly different) new file.
+        self.start_watching();
+        // Build content-relative heading positions for accurate scroll navigation.
+        self.build_content_headings();
+        true
     }
 
     /// Reload the current file from disk without changing history.
@@ -1676,87 +1723,59 @@ impl MarkdownApp {
 
     /// Navigate one step back in history. Returns `true` on success.
     fn go_back(&mut self) -> bool {
-        if self.can_go_back() {
-            self.history_index -= 1;
-            let path = self.history[self.history_index].clone();
-            // eprintln!(
-            //     "Succeeded in self.go_back(), self.history_index={}",
-            //     self.history_index
-            // );
-            self.load_file(path)
-        } else {
-            eprintln!(
-                "Failed self.go_back(), self.history_index={0}",
-                self.history_index
-            );
-            false
-        }
+        self.can_go_back() && self.goto_history(self.history_index - 1)
     }
 
     /// Navigate one step forward in history. Returns `true` on success.
     fn go_forward(&mut self) -> bool {
-        if self.can_go_forward() {
-            self.history_index += 1;
-            let path = self.history[self.history_index].clone();
-            // eprintln!(
-            //     "Succeeded in self.go_forward(), self.history_index={}",
-            //     self.history_index
-            // );
-            self.load_file(path)
+        self.can_go_forward() && self.goto_history(self.history_index + 1)
+    }
+
+    /// Load history entry `index`. `history_index` only moves if the load succeeds, so a
+    /// failure (e.g. the file has been deleted) leaves the index matching what is displayed.
+    fn goto_history(&mut self, index: usize) -> bool {
+        let Some(path) = self.history.get(index).cloned() else {
+            return false;
+        };
+        if self.load_file(path) {
+            self.history_index = index;
+            true
         } else {
-            eprintln!(
-                "Failed self.go_forward(), self.history_index={0}",
-                self.history_index
-            );
             false
         }
     }
 
-    /// Close current file and try to go one step back in history, or failing that,
-    /// one step forward.
-    /// Returns `true` on success.
-    fn close(&mut self, ctx: &egui::Context) -> bool {
-        let remove_hist_index = self.history_index;
-        let success = self.go_back() || self.go_forward();
-        eprintln!(
-            "success={success}, remove_hist_index={remove_hist_index}, self.history={:?}",
-            self.history
-        );
-        if success {
-            match self.history.len() {
-                0 => false,
-                1 => {
-                    let _ = self.history.remove(0);
-                    true
-                }
-                _ => {
-                    let _ = self.history.remove(remove_hist_index);
-                    if remove_hist_index < self.history.len() {
-                        // Shift index back
-                        self.history_index = self.history_index.saturating_sub(1);
-                    }
-                    true
-                }
-            }
-        } else {
-            match self.history.len() {
-                0 => {
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                    true
-                }
-                1 => {
-                    let _ = self.history.remove(0);
-                    self.welcome(ctx);
-                    true
-                }
-                _ => {
-                    unreachable!()
-                }
+    /// Close the current file, removing it from the history, and show the nearest earlier
+    /// entry that can still be loaded, or failing that the nearest later one. If nothing can
+    /// be shown, show the welcome page; if there was nothing open in the first place, close
+    /// the window.
+    fn close(&mut self, ctx: &egui::Context) {
+        if self.history.is_empty() {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            return;
+        }
+        let removed = self.history_index.min(self.history.len() - 1);
+        self.history.remove(removed);
+
+        // After the removal, entries before `removed` keep their index and later ones have
+        // shifted down into `removed..`.
+        let candidates: Vec<usize> = (0..removed)
+            .rev()
+            .chain(removed..self.history.len())
+            .collect();
+        for index in candidates {
+            if self.goto_history(index) {
+                return;
             }
         }
+        self.history_index = removed.min(self.history.len().saturating_sub(1));
+        self.welcome(ctx);
     }
 
     fn welcome(&mut self, ctx: &egui::Context) {
+        // Nothing to watch any more.
+        self.watcher = None;
+        self.watcher_rx = None;
         self.raw_content = t!(
             "welcome.instruction",
             cmd = MOD,
@@ -1775,6 +1794,7 @@ impl MarkdownApp {
         self.show_toc = true;
         self.html = HtmlRenderer::new(path_to_file_uri(&canonical_initial_path));
         self.current_file_path = canonical_initial_path;
+        self.build_content_headings();
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(format!(
             "workman: {}",
             self.current_file_path.display()
@@ -1783,9 +1803,7 @@ impl MarkdownApp {
 
     /// Load a specific entry from the history stack. Returns `true` on success.
     fn load_history(&mut self, n: usize) -> bool {
-        self.history_index = n;
-        let path = self.history[self.history_index].clone();
-        self.load_file(path)
+        self.goto_history(n)
     }
 
     /// Resolve a clicked relative link, load it, and push it onto history (discarding any
@@ -1833,22 +1851,7 @@ impl MarkdownApp {
     /// relying on `id: Some(...)` — robust even if a heading's injected
     /// `{#slug}` is absent or unparsed for any reason.
     fn build_content_headings(&mut self) {
-        self.content_heading_positions.clear();
-        let opts = Options::ENABLE_TABLES
-            | Options::ENABLE_TASKLISTS
-            | Options::ENABLE_STRIKETHROUGH
-            | Options::ENABLE_FOOTNOTES
-            | Options::ENABLE_HEADING_ATTRIBUTES;
-        let mut toc_idx = 0usize;
-        for (event, span) in Parser::new_ext(&self.content, opts).into_offset_iter() {
-            if let Event::Start(Tag::Heading { .. }) = event {
-                if let Some(entry) = self.toc.get(toc_idx) {
-                    self.content_heading_positions
-                        .push((span.start, entry.slug.clone()));
-                }
-                toc_idx += 1;
-            }
-        }
+        self.content_heading_positions = content_heading_positions(&self.content, &self.toc);
     }
 
     fn load_and_register_history(&mut self, path: PathBuf) -> bool {
@@ -2684,6 +2687,13 @@ impl eframe::App for MarkdownApp {
                     ui.ctx().request_repaint_after(Duration::from_millis(250));
                 }
 
+                // The user's config file was present but unusable (we carried on with defaults).
+                if let Some(err) = config::config_error() {
+                    ui.separator();
+                    ui.colored_label(ui.visuals().warn_fg_color, "\u{26a0} config.toml")
+                        .on_hover_text(err);
+                }
+
                 // Viewport-cache toggle — only shown for large documents.
                 if doc_is_large {
                     ui.separator();
@@ -3196,7 +3206,10 @@ impl eframe::App for MarkdownApp {
                 NavAction::Forward => self.go_forward(),
                 NavAction::History(n) => self.load_history(n),
                 NavAction::None => false,
-                NavAction::Close(ctx) => self.close(&ctx),
+                NavAction::Close(ctx) => {
+                    self.close(&ctx);
+                    true
+                }
             }
         };
 
@@ -3280,4 +3293,145 @@ fn customise_scrollbar(ui: &mut egui::Ui) {
     scroll.interact_handle_opacity = 0.55;
     scroll.active_handle_opacity = 0.80;
     scroll.kinetic.rubber_band = false;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let dir = env::temp_dir().join(format!("workman-test-{}-{name}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    // ── file_uri_from_str ──────────────────────────────────────────────────────────────
+
+    #[test]
+    fn uri_unix_path() {
+        assert_eq!(
+            file_uri_from_str("/home/me/doc.md", false),
+            "file:///home/me/doc.md"
+        );
+    }
+
+    #[test]
+    fn uri_encodes_unsafe_characters() {
+        assert_eq!(
+            file_uri_from_str("/a b/c#d/100%/(x).png", false),
+            "file:///a%20b/c%23d/100%25/%28x%29.png"
+        );
+        // Non-ASCII is encoded as UTF-8 bytes.
+        assert_eq!(
+            file_uri_from_str("/na\u{ef}ve", false),
+            "file:///na%C3%AFve"
+        );
+    }
+
+    #[test]
+    fn uri_backslash_is_literal_on_unix() {
+        assert_eq!(file_uri_from_str("/a\\b", false), "file:///a%5Cb");
+    }
+
+    #[test]
+    fn uri_windows_drive_path() {
+        assert_eq!(
+            file_uri_from_str(r"C:\Users\me\my doc.md", true),
+            "file:///C:/Users/me/my%20doc.md"
+        );
+    }
+
+    #[test]
+    fn uri_windows_verbatim_prefixes() {
+        assert_eq!(
+            file_uri_from_str(r"\\?\C:\dir\a.md", true),
+            "file:///C:/dir/a.md"
+        );
+        assert_eq!(
+            file_uri_from_str(r"\\?\UNC\server\share\a.md", true),
+            "file://server/share/a.md"
+        );
+        assert_eq!(
+            file_uri_from_str(r"\\server\share\a.md", true),
+            "file://server/share/a.md"
+        );
+    }
+
+    // ── TOC / heading positions ────────────────────────────────────────────────────────
+
+    #[test]
+    fn heading_positions_skip_headings_the_toc_skips() {
+        // A setext heading is reported by pulldown-cmark but is not an ATX heading, so it is
+        // not in the TOC. The headings after it must still be paired with the right slugs
+        // (previously every later heading was shifted by one).
+        let raw = "# One\n\nSetext\n======\n\n> ## Quoted\n\n## Two\n\n### Three\n";
+        let (content, toc) = extract_toc_and_inject_ids(raw);
+        let slugs: Vec<&str> = toc.iter().map(|e| e.slug.as_str()).collect();
+        assert_eq!(slugs, ["one", "quoted", "two", "three"]);
+
+        let positions = content_heading_positions(&content, &toc);
+        assert_eq!(positions.len(), toc.len());
+        for ((start, slug), entry) in positions.iter().zip(&toc) {
+            assert_eq!(slug, &entry.slug);
+            let line = content[*start..].lines().next().unwrap();
+            assert!(
+                line.contains(&format!("{{#{slug}}}")),
+                "line {line:?} should carry {{#{slug}}}"
+            );
+        }
+    }
+
+    #[test]
+    fn heading_positions_ignore_headings_in_code_fences() {
+        let raw = "```\n# not a heading\n```\n\n# Real\n";
+        let (content, toc) = extract_toc_and_inject_ids(raw);
+        assert_eq!(toc.len(), 1);
+        let positions = content_heading_positions(&content, &toc);
+        assert_eq!(positions.len(), 1);
+        assert_eq!(positions[0].1, "real");
+    }
+
+    // ── reading files ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn oversized_file_is_refused_without_reading_it() {
+        let dir = temp_dir("oversized");
+        let path = dir.join("big.md");
+        // A sparse file: the size check must reject it from metadata alone.
+        fs::File::create(&path)
+            .unwrap()
+            .set_len(MAX_BYTES as u64 + 1)
+            .unwrap();
+        let content = read_markdown_file(&path).unwrap();
+        assert!(content.starts_with("# \u{26a0} File Too Large"));
+        assert!(content.contains("big.md"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn file_at_the_limit_is_read() {
+        let dir = temp_dir("at-limit");
+        let path = dir.join("ok.md");
+        fs::write(&path, vec![b'a'; MAX_BYTES]).unwrap();
+        let content = read_markdown_file(&path).unwrap();
+        assert_eq!(content.len(), MAX_BYTES);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn invalid_utf8_is_replaced_not_rejected() {
+        let dir = temp_dir("latin1");
+        let path = dir.join("latin1.md");
+        fs::write(&path, b"caf\xe9\n").unwrap();
+        assert_eq!(read_markdown_file(&path).unwrap(), "caf\u{fffd}\n");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn missing_file_is_an_error() {
+        let dir = temp_dir("missing");
+        assert!(read_markdown_file(&dir.join("nope.md")).is_err());
+        let _ = fs::remove_dir_all(&dir);
+    }
 }
