@@ -745,4 +745,51 @@ mod render_tests {
         assert_eq!(r.resolve("./a/b.png"), "file:///tmp/doc/a/b.png");
         assert_eq!(r.resolve("https://x/y.png"), "https://x/y.png");
     }
+
+    #[test]
+    fn script_and_style_content_is_never_painted() {
+        let text = painted_text("<script>EVIL()</script><style>.x{}</style><p>visible</p>");
+        assert!(text.contains("visible"), "{text}");
+        assert!(!text.contains("EVIL") && !text.contains(".x{}"), "{text}");
+    }
+
+    #[test]
+    fn tags_are_case_insensitive() {
+        let text = painted_text("<P>upper</P><DIV>box</DIV>");
+        assert!(text.contains("upper") && text.contains("box"), "{text}");
+    }
+
+    #[test]
+    fn malformed_html_does_not_panic() {
+        for html in [
+            "",
+            "<",
+            "<<>>",
+            "<div",
+            "<div><p>unclosed",
+            "</div></div>",
+            "<table><tr><td>cell",
+            "<details><summary>no close",
+            "<img src=>",
+            "<a href=\"x\"><a href=\"y\">nested</a></a>",
+            "<ul><li>a<li>b</ul>",
+        ] {
+            let _ = painted_text(html);
+        }
+    }
+
+    #[test]
+    fn resolve_leaves_urls_and_data_uris_alone_and_strips_dot_slash() {
+        let r = HtmlRenderer::new("file:///tmp/doc/README.md");
+        assert_eq!(
+            r.resolve("data:image/png;base64,AA"),
+            "data:image/png;base64,AA"
+        );
+        assert_eq!(r.resolve("file:///x/y.png"), "file:///x/y.png");
+        assert_eq!(r.resolve("a.png"), "file:///tmp/doc/a.png");
+        assert_eq!(r.resolve("./a.png"), "file:///tmp/doc/a.png");
+        // A base that is a directory URI (ends in `/`) works too.
+        let d = HtmlRenderer::new("file:///tmp/doc/");
+        assert_eq!(d.resolve("a.png"), "file:///tmp/doc/a.png");
+    }
 }

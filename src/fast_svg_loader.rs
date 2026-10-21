@@ -181,3 +181,147 @@ impl ImageLoader for FastSvgLoader {
         });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SVG: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><rect width="4" height="4" fill="red"/></svg>"#;
+
+    fn setup(uri: &'static str, bytes: &'static [u8]) -> (egui::Context, FastSvgLoader) {
+        let ctx = egui::Context::default();
+        ctx.include_bytes(uri, bytes);
+        (ctx, FastSvgLoader::new())
+    }
+
+    fn cached_sizes(loader: &FastSvgLoader, uri: &str) -> usize {
+        loader
+            .state
+            .lock()
+            .unwrap()
+            .cache
+            .get(uri)
+            .map_or(0, HashMap::len)
+    }
+
+    /// If this drifts, egui_commonmark would construct the 20-second default loader again.
+    #[test]
+    fn id_matches_the_loader_it_replaces() {
+        assert_eq!(
+            FastSvgLoader::ID,
+            egui_extras::loaders::svg_loader::SvgLoader::ID
+        );
+        assert_eq!(FastSvgLoader::new().id(), FastSvgLoader::ID);
+    }
+
+    #[test]
+    fn non_svg_uris_are_not_supported() {
+        let (ctx, loader) = setup("bytes://a.png", b"x");
+        for uri in [
+            "bytes://a.png",
+            "file:///x/y.jpg",
+            "https://x/y",
+            "no-extension",
+        ] {
+            assert!(
+                matches!(
+                    loader.load(&ctx, uri, SizeHint::default()),
+                    Err(LoadError::NotSupported)
+                ),
+                "{uri}"
+            );
+        }
+    }
+
+    #[test]
+    fn svg_extension_is_case_insensitive() {
+        let (ctx, loader) = setup("bytes://UPPER.SVG", SVG);
+        assert!(matches!(
+            loader.load(&ctx, "bytes://UPPER.SVG", SizeHint::default()),
+            Ok(ImagePoll::Ready { .. })
+        ));
+    }
+
+    #[test]
+    fn svg_is_rasterised_and_cached_per_size() {
+        let (ctx, loader) = setup("bytes://a.svg", SVG);
+        let Ok(ImagePoll::Ready { image }) = loader.load(&ctx, "bytes://a.svg", SizeHint::Width(8))
+        else {
+            panic!("expected a ready image");
+        };
+        assert_eq!(image.size, [8, 8]);
+        assert_eq!(cached_sizes(&loader, "bytes://a.svg"), 1);
+
+        // Same size: served from the cache; different size: a second entry.
+        assert!(
+            loader
+                .load(&ctx, "bytes://a.svg", SizeHint::Width(8))
+                .is_ok()
+        );
+        assert_eq!(cached_sizes(&loader, "bytes://a.svg"), 1);
+        assert!(
+            loader
+                .load(&ctx, "bytes://a.svg", SizeHint::Width(16))
+                .is_ok()
+        );
+        assert_eq!(cached_sizes(&loader, "bytes://a.svg"), 2);
+        assert!(loader.byte_size() > 0);
+    }
+
+    #[test]
+    fn invalid_svg_is_a_cached_loading_error() {
+        let (ctx, loader) = setup("bytes://bad.svg", b"this is not svg");
+        for _ in 0..2 {
+            assert!(matches!(
+                loader.load(&ctx, "bytes://bad.svg", SizeHint::default()),
+                Err(LoadError::Loading(_))
+            ));
+        }
+        assert_eq!(cached_sizes(&loader, "bytes://bad.svg"), 1);
+    }
+
+    #[test]
+    fn forget_and_forget_all_drop_cache_entries() {
+        let (ctx, loader) = setup("bytes://a.svg", SVG);
+        ctx.include_bytes("bytes://b.svg", SVG);
+        loader
+            .load(&ctx, "bytes://a.svg", SizeHint::default())
+            .unwrap();
+        loader
+            .load(&ctx, "bytes://b.svg", SizeHint::default())
+            .unwrap();
+
+        loader.forget("bytes://a.svg");
+        assert_eq!(cached_sizes(&loader, "bytes://a.svg"), 0);
+        assert_eq!(cached_sizes(&loader, "bytes://b.svg"), 1);
+
+        loader.forget_all();
+        assert_eq!(cached_sizes(&loader, "bytes://b.svg"), 0);
+        assert_eq!(loader.byte_size(), 0);
+    }
+
+    #[test]
+    fn end_pass_evicts_stale_sizes_but_keeps_a_lone_entry() {
+        let (ctx, loader) = setup("bytes://a.svg", SVG);
+        loader.end_pass(0);
+        loader
+            .load(&ctx, "bytes://a.svg", SizeHint::Width(8))
+            .unwrap();
+        loader
+            .load(&ctx, "bytes://a.svg", SizeHint::Width(16))
+            .unwrap();
+        assert_eq!(cached_sizes(&loader, "bytes://a.svg"), 2);
+
+        // Both used in pass 0; at pass 5 neither is recent, but only buckets with several
+        // sizes are pruned, and a bucket that empties is removed.
+        loader.end_pass(5);
+        assert_eq!(cached_sizes(&loader, "bytes://a.svg"), 0);
+
+        // A single entry is never pruned, however old (it is the only size in use).
+        loader
+            .load(&ctx, "bytes://a.svg", SizeHint::Width(8))
+            .unwrap();
+        loader.end_pass(50);
+        assert_eq!(cached_sizes(&loader, "bytes://a.svg"), 1);
+    }
+}

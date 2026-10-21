@@ -7,7 +7,6 @@ use egui::{Key, Modifiers, Popup, PopupCloseBehavior, ScrollArea};
 use egui_commonmark::{CommonMarkCache, CommonMarkScrollOptions, CommonMarkViewer, SearchOptions};
 use macros::{preload_base16_themes, preload_syntect_themes};
 use notify::{RecursiveMode, Watcher};
-use pulldown_cmark::{Event, Options, Parser, Tag};
 use rfd::FileDialog;
 use rust_i18n::t;
 use std::fs::{self, write};
@@ -52,8 +51,15 @@ use workman::config::{self, Config, Context, RealContext, maybe_config};
 //# Option: --search-collapsible (-s): Expand collapsible widgets to make them searchable.
 //# Option: --version (-V): Print version number and exit.
 //# Argument: [PATH]: Optional initial markdown file to open
-use workman::html_prep::preprocess_html_with;
+use workman::base16_yaml::parse_base16_yaml;
+use workman::cli::{self, FileArg, detect_locale, is_markdown_path};
+use workman::history::History;
 use workman::html_render::HtmlRenderer;
+use workman::loader::read_markdown_file;
+use workman::markdown::{
+    TocEntry, absolutize_image_paths, content_heading_positions, extract_toc_and_inject_ids,
+    path_to_file_uri, prepare_markdown, screen_code_fences,
+};
 
 const HIST_BACK_ICON: &str = "\u{25c0}";
 const HIST_FWD_ICON: &str = "\u{25b6}";
@@ -68,9 +74,6 @@ const MOD: &str = "Cmd";
 const ALT: &str = "Alt";
 #[cfg(not(target_os = "macos"))]
 const MOD: &str = "Ctrl";
-
-// Hard size limit — refuse immediately so the GUI doesn't freeze.
-const MAX_BYTES: usize = 50_000_000;
 
 /// Documents at or above this byte count get the viewport-cache toggle shown in
 /// the toolbar and have caching auto-enabled.  Below this size the simple
@@ -125,99 +128,6 @@ impl Base16Filter {
             Self::Light => !is_dark,
         }
     }
-}
-
-// ---------------------------------------------------------------------------
-// Minimal Base16 YAML parsing (no YAML crate needed)
-//
-// Handles both layouts:
-//   old:  scheme: "Name"        / base00: "181818" ...
-//   new:  name: "Name" / variant: "dark" / palette: { base00: "181818" ... }
-// Only flat `key: value` lines are understood, which covers every published
-// Base16 / tinted-theming scheme file.
-// ---------------------------------------------------------------------------
-
-fn yaml_scalar(v: &str) -> String {
-    let v = v.trim();
-    if let Some(q) = v.chars().next().filter(|&c| c == '"' || c == '\'') {
-        return v[1..].split(q).next().unwrap_or("").to_owned();
-    }
-    v.split(" #").next().unwrap_or("").trim().to_owned()
-}
-
-#[expect(clippy::cast_possible_truncation)]
-fn parse_hex(s: &str) -> Result<Color32, String> {
-    let s = s.trim_start_matches('#');
-    let bad = || format!("invalid colour {s:?}");
-    if s.len() != 6 {
-        return Err(bad());
-    }
-    let n = u32::from_str_radix(s, 16).map_err(|_| bad())?;
-    Ok(Color32::from_rgb((n >> 16) as u8, (n >> 8) as u8, n as u8))
-}
-
-fn parse_base16_yaml(src: &str, fallback_name: &str) -> Result<Base16, String> {
-    let mut name = None;
-    let mut variant = None;
-    let mut c: [Option<Color32>; 16] = [None; 16];
-
-    for line in src.lines() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-        let Some((key, value)) = line.split_once(':') else {
-            continue;
-        };
-        let key = key.trim().trim_matches(|ch| ch == '"' || ch == '\'');
-        let value = yaml_scalar(value);
-
-        match key {
-            "name" | "scheme" => name = Some(value),
-            "variant" => variant = Some(value.to_ascii_lowercase()),
-            _ => {
-                if let Some(hex) = key.strip_prefix("base").filter(|h| h.len() == 2) && let Ok(i) = usize::from_str_radix(hex, 16)
-                        // ignore extra base24 fields
-                        && i < c.len()
-                {
-                    // eprintln!("key={key}, i={i}");
-                    c[i] = Some(parse_hex(&value).map_err(|e| format!("{key}: {e}"))?);
-                }
-            }
-        }
-    }
-
-    let missing: Vec<String> = (0..16)
-        .filter(|&i| c[i].is_none())
-        .map(|i| format!("base{i:02X}"))
-        .collect();
-    if !missing.is_empty() {
-        return Err(format!("missing {}", missing.join(", ")));
-    }
-    let c: [Color32; 16] = c.map(|x| x.unwrap());
-
-    // Prefer an explicit `variant`; otherwise judge by base00 (the background).
-    let is_dark = match variant.as_deref() {
-        Some("dark") => true,
-        Some("light") => false,
-        _ => {
-            let bg = c[0];
-            // 0.299 * bg.r() as f32 + 0.587 * bg.g() as f32 + 0.114 * (bg.b() as f32) < 128.0
-            0.114_f32.mul_add(
-                f32::from(bg.b()),
-                0.587_f32.mul_add(f32::from(bg.g()), 0.299 * f32::from(bg.r())),
-            ) < 128.0
-        }
-    };
-
-    // Themes are keyed by `&'static str`, so loaded names are leaked. That's a
-    // few bytes per file the user chooses to load.
-    let name: &'static str = Box::leak(
-        name.unwrap_or_else(|| fallback_name.to_owned())
-            .into_boxed_str(),
-    );
-
-    Ok(Base16 { name, is_dark, c })
 }
 
 // ---------------------------------------------------------------------------
@@ -364,437 +274,6 @@ fn adjust_color(color: Color32, factor: f32) -> Color32 {
     color
 }
 
-// ─── TOC / heading extraction ──────────────────────────────────────────────────
-
-/// An entry in the table of contents, derived from one ATX heading in the document.
-#[derive(Clone)]
-struct TocEntry {
-    /// Heading depth 1–6.
-    level: u8,
-    /// Display text (raw heading text; may include inline markup such as `**bold**`).
-    text: String,
-    /// The `{#slug}` injected into the rendered content, used as the scroll target.
-    slug: String,
-}
-
-/// Converts heading text to a URL-safe slug: lowercased, non-alphanumeric runs replaced by `-`.
-fn slugify(text: &str) -> String {
-    let mut slug = String::with_capacity(text.len());
-    let mut prev_sep = true; // start true to drop any leading hyphens
-    for ch in text.chars() {
-        if ch.is_alphanumeric() {
-            slug.push(ch.to_ascii_lowercase());
-            prev_sep = false;
-        } else if !prev_sep {
-            slug.push('-');
-            prev_sep = true;
-        }
-    }
-    if slug.ends_with('-') {
-        slug.pop();
-    }
-    slug
-}
-
-/// Parses an ATX heading line and returns `(level, plain_text)`.
-/// `plain_text` is the heading content with any trailing `{…}` attribute block stripped.
-/// Returns `None` for non-heading lines, indented lines, or malformed ATX syntax.
-#[expect(clippy::cast_possible_truncation)]
-fn parse_heading_line(line: &str) -> Option<(u8, &str)> {
-    let hashes = line.bytes().take_while(|&b| b == b'#').count();
-    if hashes == 0 || hashes > 6 {
-        return None;
-    }
-    // ATX heading must have a space after the `#` run.
-    let rest = line[hashes..].strip_prefix(' ')?;
-    let text = rest.trim_end();
-    if text.is_empty() {
-        return None;
-    }
-    // Strip any trailing `{#id}` / `{.class}` attribute block.
-    let plain = text.rfind('{').map_or(text, |brace| {
-        let attr = text[brace..].trim_end();
-        if attr.ends_with('}') {
-            text[..brace].trim_end()
-        } else {
-            text
-        }
-    });
-    Some((hashes as u8, plain))
-}
-
-/// Returns the explicit `{#id}` from a heading line, if present.
-fn extract_heading_id(line: &str) -> Option<&str> {
-    let brace = line.rfind('{')?;
-    let attr = line[brace..].trim_end();
-    if attr.starts_with("{#") && attr.ends_with('}') {
-        Some(&attr[2..attr.len() - 1])
-    } else {
-        None
-    }
-}
-
-/// Scans `raw` markdown, builds a `Vec<TocEntry>` from headings, and returns a version
-/// of the content with `{#slug}` attributes injected into every heading that lacks one.
-///
-/// **Uses pulldown-cmark as the heading oracle** rather than a hand-rolled fence
-/// tracker. This guarantees that the TOC and injected IDs are consistent with what
-/// the renderer sees. A custom fence tracker diverges from pulldown-cmark in edge
-/// cases such as XML-like tags (`<context>`, `<files>`) being treated as type-6 HTML
-/// blocks that can swallow a code-fence opener — leading to headings that are
-/// unreachable by the scroll mechanism.
-fn extract_toc_and_inject_ids(raw: &str) -> (String, Vec<TocEntry>) {
-    let pc_opts = Options::ENABLE_TABLES
-        | Options::ENABLE_TASKLISTS
-        | Options::ENABLE_STRIKETHROUGH
-        | Options::ENABLE_FOOTNOTES
-        | Options::ENABLE_HEADING_ATTRIBUTES;
-
-    // Pass 1 — ask pulldown-cmark where headings actually begin.
-    let heading_starts: Vec<usize> = Parser::new_ext(raw, pc_opts)
-        .into_offset_iter()
-        .filter_map(|(event, span)| {
-            matches!(event, Event::Start(Tag::Heading { .. })).then_some(span.start)
-        })
-        .collect();
-
-    // Pass 2 — rebuild content, injecting `{#slug}` at each pulldown-cmark-verified heading.
-    let mut out = String::with_capacity(raw.len() + heading_starts.len() * 24);
-    let mut toc: Vec<TocEntry> = Vec::new();
-    let mut slug_counts: HashMap<String, usize> = HashMap::new();
-    let mut pos = 0usize; // read cursor into `raw`
-
-    for line_start in heading_starts {
-        // Emit everything between the last position and this heading.
-        out.push_str(&raw[pos..line_start]);
-
-        // Extract the heading line (up to but not including the trailing `\n`).
-        let newline = raw[line_start..]
-            .find('\n')
-            .map_or(raw.len(), |p| line_start + p);
-        let line = &raw[line_start..newline];
-
-        // Use our ATX parser to get the level and plain text.
-        if let Some((level, plain_text)) = parse_heading_line(line) {
-            let (slug, injected) = extract_heading_id(line).map_or_else(
-                || {
-                    let base = slugify(plain_text);
-                    let n = slug_counts.entry(base.clone()).or_insert(0);
-                    let slug = if *n == 0 { base } else { format!("{base}-{n}") };
-                    *n += 1;
-                    let with_id = format!("{} {{#{slug}}}", line.trim_end());
-                    (slug, with_id)
-                },
-                |id| (id.to_string(), line.to_string()),
-            );
-            toc.push(TocEntry {
-                level,
-                text: plain_text.to_string(),
-                slug,
-            });
-            out.push_str(&injected);
-        } else {
-            // pulldown-cmark found a heading our ATX parser doesn't recognise
-            // (e.g. setext style). Pass it through without injection.
-            out.push_str(line);
-        }
-
-        // Advance past the newline (or to end-of-file).
-        pos = if newline < raw.len() {
-            out.push('\n');
-            newline + 1
-        } else {
-            newline
-        };
-    }
-
-    // Emit the tail of the file after the last heading.
-    out.push_str(&raw[pos..]);
-
-    (out, toc)
-}
-
-/// Byte offset and slug of each TOC heading within `content` (the prepared markdown).
-///
-/// `toc` only contains the headings that `extract_toc_and_inject_ids` could parse as ATX
-/// headings; pulldown-cmark also reports setext headings and headings nested in block quotes
-/// or lists, whose span doesn't start at the `#`. Those must be skipped here too, using the
-/// same test, or every later heading would be paired with the wrong TOC entry.
-fn content_heading_positions(content: &str, toc: &[TocEntry]) -> Vec<(usize, String)> {
-    let opts = Options::ENABLE_TABLES
-        | Options::ENABLE_TASKLISTS
-        | Options::ENABLE_STRIKETHROUGH
-        | Options::ENABLE_FOOTNOTES
-        | Options::ENABLE_HEADING_ATTRIBUTES;
-    let mut entries = toc.iter();
-    let mut positions = Vec::with_capacity(toc.len());
-    for (event, span) in Parser::new_ext(content, opts).into_offset_iter() {
-        if !matches!(event, Event::Start(Tag::Heading { .. })) {
-            continue;
-        }
-        let line_end = content[span.start..]
-            .find('\n')
-            .map_or(content.len(), |p| span.start + p);
-        if parse_heading_line(&content[span.start..line_end]).is_none() {
-            continue;
-        }
-        match entries.next() {
-            Some(entry) => positions.push((span.start, entry.slug.clone())),
-            None => break,
-        }
-    }
-    positions
-}
-
-// ─── Image path absolutization ─────────────────────────────────────────────────
-
-/// Rewrites relative image paths in Markdown to absolute `file://` URIs so they
-/// load correctly regardless of platform CWD behaviour.
-///
-/// Paths that already carry a URI scheme (`http://`, `file://`, `data:`, …) are
-/// left untouched. If a relative path cannot be resolved (file does not exist)
-/// it is also left untouched so existing error behaviour is preserved.
-///
-/// Note: processes the raw text, so a path inside a fenced code block is also
-/// rewritten if it matches the image syntax — an acceptable trade-off for the
-/// cross-platform fix.
-fn absolutize_image_paths(content: &str, base_dir: &Path) -> String {
-    let mut out = String::with_capacity(content.len() + 128);
-    let mut rest = content;
-
-    while let Some(bang) = rest.find("![") {
-        out.push_str(&rest[..bang]);
-        rest = &rest[bang..];
-
-        // Find `](`  — alt text must not contain `]`
-        let Some(close_bracket) = rest.find("](") else {
-            out.push_str(&rest[..2]);
-            rest = &rest[2..];
-            continue;
-        };
-
-        let prefix = &rest[..close_bracket + 2]; // `![alt](`
-        rest = &rest[close_bracket + 2..];
-
-        let Some(close_paren) = rest.find(')') else {
-            out.push_str(prefix);
-            continue;
-        };
-
-        let inner = &rest[..close_paren]; // path, possibly with `"title"`
-        rest = &rest[close_paren + 1..];
-
-        // Split optional title: `path "title"` or `path 'title'`
-        let (raw_path, title_suffix) = inner
-            .find(" \"")
-            .or_else(|| inner.find(" '"))
-            .map_or_else(|| (inner.trim(), ""), |i| (&inner[..i], &inner[i..]));
-
-        let is_schemed = raw_path.starts_with("http://")
-            || raw_path.starts_with("https://")
-            || raw_path.starts_with("file://")
-            || raw_path.starts_with("data:");
-
-        out.push_str(prefix);
-        if is_schemed {
-            out.push_str(inner);
-        } else if let Ok(abs) = base_dir.join(raw_path).canonicalize() {
-            out.push_str(&path_to_file_uri(&abs));
-            out.push_str(title_suffix);
-        } else {
-            // File not found — leave unchanged so the viewer shows a
-            // broken-image placeholder rather than silently doing nothing.
-            out.push_str(inner);
-        }
-        out.push(')');
-    }
-    out.push_str(rest);
-    out
-}
-
-/// Turns raw file text into what `egui_commonmark` displays: embedded HTML is
-/// rewritten (see `html_prep`), then heading `{#slug}` ids are injected (and the
-/// TOC built), then relative image paths are absolutized.
-fn prepare_markdown(
-    raw: &str,
-    base_dir: &Path,
-    search_collapsible: bool,
-) -> (String, Vec<TocEntry>) {
-    let prepared = preprocess_html_with(raw, search_collapsible);
-    let (id_injected, toc) = extract_toc_and_inject_ids(&prepared);
-    (absolutize_image_paths(&id_injected, base_dir), toc)
-}
-
-/// Builds a `file://` URI for `path`, percent-encoding anything that isn't safe in a URI
-/// (spaces, `#`, `%`, parentheses, non-ASCII, ...). `egui`'s file loader decodes these.
-fn path_to_file_uri(path: &Path) -> String {
-    file_uri_from_str(&path.to_string_lossy(), cfg!(windows))
-}
-
-/// Platform-independent core of [`path_to_file_uri`]; `windows` selects Windows path syntax
-/// so that it can be tested on any platform.
-fn file_uri_from_str(raw: &str, windows: bool) -> String {
-    let mut s = if windows {
-        raw.replace('\\', "/")
-    } else {
-        raw.to_owned()
-    };
-    if windows {
-        // `canonicalize()` yields verbatim paths: `\\?\C:\dir` and `\\?\UNC\server\share`.
-        if let Some(rest) = s.strip_prefix("//?/UNC/") {
-            s = format!("//{rest}");
-        } else if let Some(rest) = s.strip_prefix("//?/") {
-            s = rest.to_owned();
-        }
-    }
-
-    let mut encoded = String::with_capacity(s.len() + 16);
-    for &b in s.as_bytes() {
-        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~' | b'/' | b':') {
-            encoded.push(char::from(b));
-        } else {
-            encoded.push_str(&format!("%{b:02X}"));
-        }
-    }
-
-    if encoded.starts_with("//") {
-        format!("file:{encoded}") // UNC: file://server/share/...
-    } else if encoded.starts_with('/') {
-        format!("file://{encoded}") // file:// + /unix/path = file:///unix/path
-    } else {
-        format!("file:///{encoded}") // file:/// + C:/... = file:///C:/...
-    }
-}
-
-// ─── Code fence pre-screening ────────────────────────────────────────────────
-
-/// A code-fence problem detected before rendering.
-enum FenceError {
-    /// Total fence boundary count is odd — at least one fence is unclosed.
-    OddCount { total: usize },
-    /// An even-numbered boundary carries a language tag, meaning the preceding
-    /// typed opener was never closed.
-    UnclosedBeforeTyped {
-        at_line: usize,
-        at_header: String,
-        prev_typed: Option<(usize, String)>,
-    },
-}
-
-/// Scan `content` for fence problems without a full parser.
-///
-/// A fence boundary is a line with ≤ 3 leading spaces that starts with a triple backtick
-/// or triple tilde (`~~~`) (matching the same rule used by `extract_toc_and_inject_ids`).
-///
-/// Two invariants are checked:
-/// - **(a)** Total boundary count must be even — odd means at least one unclosed.
-/// - **(b)** Every *typed* boundary (one with a language tag) must be
-///   odd-numbered in sequence; an even-numbered typed boundary means the
-///   previous typed opener was never closed.
-fn validate_code_fences(content: &str) -> Result<(), FenceError> {
-    let mut fence_count = 0usize;
-    let mut last_typed: Option<(usize, String)> = None;
-
-    for (idx, line) in content.lines().enumerate() {
-        let line_num = idx + 1;
-        let trimmed = line.trim_start_matches(' ');
-        if line.len() - trimmed.len() > 3 {
-            continue;
-        }
-        let is_backtick = trimmed.starts_with("```");
-        let is_tilde = trimmed.starts_with("~~~");
-        if !is_backtick && !is_tilde {
-            continue;
-        }
-
-        fence_count += 1;
-
-        // Strip all leading fence chars to get the language tag (if any).
-        let lang = if is_backtick {
-            trimmed.trim_start_matches('`')
-        } else {
-            trimmed.trim_start_matches('~')
-        }
-        .trim();
-
-        if !lang.is_empty() {
-            if fence_count.is_multiple_of(2) {
-                // Even-numbered typed boundary → previous opener was never closed.
-                return Err(FenceError::UnclosedBeforeTyped {
-                    at_line: line_num,
-                    at_header: trimmed.trim_end().to_string(),
-                    prev_typed: last_typed,
-                });
-            }
-            last_typed = Some((line_num, trimmed.trim_end().to_string()));
-        }
-    }
-
-    if !fence_count.is_multiple_of(2) {
-        return Err(FenceError::OddCount { total: fence_count });
-    }
-    Ok(())
-}
-
-/// Return a one-line description of a fence error suitable for `eprintln!`.
-fn fence_err_brief(err: &FenceError, path: &Path) -> String {
-    let p = path.display();
-    match err {
-        FenceError::OddCount { total } => {
-            format!("malformed code fence in '{p}': odd boundary count ({total} total)")
-        }
-        FenceError::UnclosedBeforeTyped {
-            at_line,
-            at_header,
-            prev_typed,
-        } => match prev_typed {
-            Some((pl, ph)) => format!(
-                "malformed code fence in '{p}': unclosed fence between \
-                     '{ph}' (line {pl}) and '{at_header}' (line {at_line})"
-            ),
-            None => format!(
-                "malformed code fence in '{p}': unclosed fence before \
-                     '{at_header}' (line {at_line})"
-            ),
-        },
-    }
-}
-
-/// Build a markdown error page to display instead of a broken file.
-/// The error renders nicely in the viewer; the user can fix the file and
-/// press Cmd/Ctrl-R to reload.
-fn fence_error_content(path: &Path, err: &FenceError) -> String {
-    let file = path.display();
-    let mod_key = MOD;
-    match err {
-        FenceError::OddCount { total } => format!(
-            "# \u{26a0} Malformed Code Fence\n\n\
-             Cannot render `{file}`.\n\n\
-             **Odd number of fence boundaries detected ({total} total)** \u{2014} \
-             at least one code fence is unclosed.\n\n\
-             Please fix the file, then press **{mod_key}-R** to reload."
-        ),
-        FenceError::UnclosedBeforeTyped {
-            at_line,
-            at_header,
-            prev_typed,
-        } => {
-            let location = match prev_typed {
-                Some((pl, ph)) => {
-                    format!("between `{ph}` on line {pl} and `{at_header}` on line {at_line}")
-                }
-                None => format!("before `{at_header}` on line {at_line}"),
-            };
-            format!(
-                "# \u{26a0} Malformed Code Fence\n\n\
-                 Cannot render `{file}`.\n\n\
-                 **Unclosed code fence detected** \u{2014} {location}.\n\n\
-                 Please fix the file, then press **{mod_key}-R** to reload."
-            )
-        }
-    }
-}
-
 /// On Unix systems: if any stdio stream is a real terminal and `--foreground` is not
 /// present, spawn a detached child with a new session and exit the parent immediately,
 /// freeing the terminal. Errors (e.g. can't find the current exe) fall through silently
@@ -851,27 +330,6 @@ fn detach_if_tty() {
     // spawn failed — fall through and run in the foreground.
 }
 
-/// Detect the preferred UI locale from the operating system.
-/// Uses `sys-locale` which reads native OS APIs (`CFPreferences` on macOS,
-/// `GetUserDefaultLocaleName` on Windows, POSIX env-vars on Linux).
-/// Falls back to `"en"` when no usable locale is detected.
-fn detect_locale() -> String {
-    let locale = env::var("LOCALE").unwrap_or_else(|_| {
-        // eprintln!("No LOCALE env var");
-        env::var("LANG").unwrap_or_else(|_| {
-            eprintln!("No LANG env var");
-            sys_locale::get_locale()
-                .filter(|loc| !loc.is_empty() && loc != "C" && loc != "POSIX")
-                .unwrap_or_else(|| "en".to_string())
-        })
-    });
-    match locale.as_str() {
-        "no" | "no-NO" => "nb",
-        other => other,
-    }
-    .to_string()
-}
-
 fn main() -> eframe::Result<()> {
     // Check for help first - automatically extracts from source comments
     let help = auto_help!();
@@ -895,7 +353,19 @@ fn main() -> eframe::Result<()> {
     // Strip option flags before processing positional arguments.
     let args: Vec<String> = env::args().filter(|a| !a.starts_with('-')).collect();
 
-    let file_arg = resolve_file_arg(&args);
+    let file_arg = match cli::resolve_file_arg(args.get(1).map(String::as_str)) {
+        Ok(FileArg::File(path)) => Some(path),
+        Ok(FileArg::Directory(dir)) => {
+            eprintln!("workman: {} is a directory; starting there", dir.display());
+            let _ = env::set_current_dir(dir);
+            None
+        }
+        Ok(FileArg::None) => None,
+        Err(e) => {
+            eprintln!("Error: {e}");
+            std::process::exit(1);
+        }
+    };
 
     let search_collapsible =
         env::args().any(|x| x == "-s" || x == "-sf" || x == "-fs" || x == "--search-collapsible");
@@ -996,32 +466,6 @@ fn main() -> eframe::Result<()> {
             )))
         }),
     )
-}
-
-fn resolve_file_arg(args: &[String]) -> Option<PathBuf> {
-    let file_arg: Option<PathBuf> = if args.len() > 1 {
-        let input_path = Path::new(&args[1]);
-        if !input_path.exists() {
-            eprintln!("Error: Input file does not exist: {}", input_path.display());
-            std::process::exit(1);
-        }
-        if input_path.is_dir() {
-            eprintln!("Error: Input path is a directory: {}", input_path.display());
-            let _ = env::set_current_dir(input_path);
-            None
-        } else if input_path.extension().is_some_and(|e| e == "md") {
-            Some(input_path.to_path_buf())
-        } else {
-            eprintln!(
-                "Error: Input file has unsupported extension: {}; must be `md`",
-                input_path.display()
-            );
-            std::process::exit(1);
-        }
-    } else {
-        None
-    };
-    file_arg
 }
 
 fn resolve_tm_name(
@@ -1162,49 +606,6 @@ fn init_empty() -> impl FnOnce() -> (PathBuf, String, String, Vec<TocEntry>) {
     }
 }
 
-/// The page shown in place of a file larger than [`MAX_BYTES`].
-#[expect(clippy::cast_precision_loss)]
-fn file_too_large_content(path: &Path, size_bytes: u64) -> String {
-    let size_mb = size_bytes as f64 / 1e6;
-    format!(
-        "# \u{26a0} File Too Large\n\n\
-         Cannot render `{}`.\n\n\
-         **File size: {size_mb:.1} MB** \u{2014} exceeds the {:.0} MB limit.\n\n\
-         Rendering files this large would make the UI unresponsive.\n\
-         Consider splitting the file into smaller sections.",
-        path.display(),
-        MAX_BYTES as f64 / 1e6,
-    )
-}
-
-/// Reads a markdown file for display.
-///
-/// Files over [`MAX_BYTES`] are never read into memory: the size is checked from the file's
-/// metadata first, and the read itself is capped in case the file grows in the meantime. Such
-/// a file yields the "too large" page instead, so that the watcher can still notice a fix.
-/// Invalid UTF-8 is replaced rather than rejected, so that e.g. a Latin-1 file is still shown.
-fn read_markdown_file(path: &Path) -> std::io::Result<String> {
-    use std::io::Read;
-
-    let too_large = |size: u64| {
-        eprintln!("workman: file too large ({size} bytes): {}", path.display());
-        Ok(file_too_large_content(path, size))
-    };
-
-    let file = fs::File::open(path)?;
-    let len = file.metadata()?.len();
-    if len > MAX_BYTES as u64 {
-        return too_large(len);
-    }
-    let mut bytes = Vec::with_capacity(usize::try_from(len).unwrap_or(0));
-    file.take(MAX_BYTES as u64 + 1).read_to_end(&mut bytes)?;
-    if bytes.len() > MAX_BYTES {
-        return too_large(bytes.len() as u64);
-    }
-    Ok(String::from_utf8(bytes)
-        .unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned()))
-}
-
 fn init_with_content(
     search_collapsible: bool,
     file: &PathBuf,
@@ -1225,16 +626,7 @@ fn init_with_content(
         )
     });
     // Pre-screen for malformed code fences before any processing.
-    let raw_content = match validate_code_fences(&raw_content) {
-        Ok(()) => raw_content,
-        Err(ref fence_err) => {
-            eprintln!(
-                "workman: {}",
-                fence_err_brief(fence_err, &canonical_initial_path)
-            );
-            fence_error_content(&canonical_initial_path, fence_err)
-        }
-    };
+    let raw_content = screen_code_fences(raw_content, &canonical_initial_path, MOD);
     let (markdown_content, toc) =
         prepare_markdown(&raw_content, &initial_base_dir, search_collapsible);
     (canonical_initial_path, raw_content, markdown_content, toc)
@@ -1357,9 +749,7 @@ struct MarkdownApp {
     /// Required by `egui_commonmark` for rendering images/styles.
     cache: CommonMarkCache,
     /// Ordered list of visited file paths.
-    history: Vec<PathBuf>,
-    /// Current position within `history`.
-    history_index: usize,
+    history: History,
     /// Multiplicative scale applied to content text only (toolbar stays at 1×).
     font_scale: f32,
     /// Table of contents entries extracted from the current document.
@@ -1466,12 +856,7 @@ impl MarkdownApp {
             raw_content,
             current_file_path: path.to_path_buf(),
             cache,
-            history: if path.is_file() {
-                vec![path.to_path_buf()]
-            } else {
-                vec![]
-            },
-            history_index: 0,
+            history: History::new(path.is_file().then(|| path.to_path_buf())),
             font_scale: 1.0,
             toc,
             show_toc: true,
@@ -1658,11 +1043,11 @@ impl MarkdownApp {
     }
 
     const fn can_go_back(&self) -> bool {
-        self.history_index > 0
+        self.history.can_go_back()
     }
 
     const fn can_go_forward(&self) -> bool {
-        self.history_index + 1 < self.history.len()
+        self.history.can_go_forward()
     }
 
     /// Load `path` from disk and update content, TOC, raw content, and CWD.
@@ -1678,13 +1063,7 @@ impl MarkdownApp {
             }
         };
         // Pre-screen for malformed code fences.
-        let raw = match validate_code_fences(&raw) {
-            Ok(()) => raw,
-            Err(ref fence_err) => {
-                eprintln!("workman: {}", fence_err_brief(fence_err, &path));
-                fence_error_content(&path, fence_err)
-            }
-        };
+        let raw = screen_code_fences(raw, &path, MOD);
         let base_dir = path
             .parent()
             .unwrap_or_else(|| Path::new("."))
@@ -1723,26 +1102,21 @@ impl MarkdownApp {
 
     /// Navigate one step back in history. Returns `true` on success.
     fn go_back(&mut self) -> bool {
-        self.can_go_back() && self.goto_history(self.history_index - 1)
+        self.can_go_back() && self.goto_history(self.history.index() - 1)
     }
 
     /// Navigate one step forward in history. Returns `true` on success.
     fn go_forward(&mut self) -> bool {
-        self.can_go_forward() && self.goto_history(self.history_index + 1)
+        self.can_go_forward() && self.goto_history(self.history.index() + 1)
     }
 
-    /// Load history entry `index`. `history_index` only moves if the load succeeds, so a
+    /// Load history entry `index`. the history position only moves if the load succeeds, so a
     /// failure (e.g. the file has been deleted) leaves the index matching what is displayed.
     fn goto_history(&mut self, index: usize) -> bool {
-        let Some(path) = self.history.get(index).cloned() else {
+        let Some(path) = self.history.get(index).map(Path::to_path_buf) else {
             return false;
         };
-        if self.load_file(path) {
-            self.history_index = index;
-            true
-        } else {
-            false
-        }
+        self.load_file(path) && self.history.set_index(index)
     }
 
     /// Close the current file, removing it from the history, and show the nearest earlier
@@ -1750,25 +1124,15 @@ impl MarkdownApp {
     /// be shown, show the welcome page; if there was nothing open in the first place, close
     /// the window.
     fn close(&mut self, ctx: &egui::Context) {
-        if self.history.is_empty() {
+        let Some(removed) = self.history.remove_current() else {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             return;
-        }
-        let removed = self.history_index.min(self.history.len() - 1);
-        self.history.remove(removed);
-
-        // After the removal, entries before `removed` keep their index and later ones have
-        // shifted down into `removed..`.
-        let candidates: Vec<usize> = (0..removed)
-            .rev()
-            .chain(removed..self.history.len())
-            .collect();
-        for index in candidates {
+        };
+        for index in self.history.close_candidates(removed) {
             if self.goto_history(index) {
                 return;
             }
         }
-        self.history_index = removed.min(self.history.len().saturating_sub(1));
         self.welcome(ctx);
     }
 
@@ -1832,10 +1196,8 @@ impl MarkdownApp {
         }
 
         if self.load_file(target_path.clone()) {
-            // Discard forward history and record the new entry.
-            self.history.truncate(self.history_index + 1);
+            // Records the new entry, discarding any forward history.
             self.history.push(target_path);
-            self.history_index = self.history.len() - 1;
             true
         } else {
             false
@@ -1857,9 +1219,7 @@ impl MarkdownApp {
     fn load_and_register_history(&mut self, path: PathBuf) -> bool {
         let canonical = path.canonicalize().unwrap_or(path);
         if self.load_file(canonical.clone()) {
-            self.history.truncate(self.history_index + 1);
             self.history.push(canonical);
-            self.history_index = self.history.len() - 1;
             true
         } else {
             false
@@ -2399,14 +1759,13 @@ impl eframe::App for MarkdownApp {
         let can_go_back = self.can_go_back();
         let can_go_forward = self.can_go_forward();
         let back_tip = self
-            .history_index
-            .checked_sub(1)
-            .and_then(|i| self.history.get(i))
+            .history
+            .previous()
             .map(|p| p.display().to_string())
             .unwrap_or_default();
         let forward_tip = self
             .history
-            .get(self.history_index + 1)
+            .next()
             .map(|p| p.display().to_string())
             .unwrap_or_default();
         let current_path_label = self.current_file_path.display().to_string();
@@ -2480,7 +1839,7 @@ impl eframe::App for MarkdownApp {
                     .raw
                     .dropped_files
                     .iter()
-                    .filter(|f| f.path().extension().is_some_and(|e| e == "md"))
+                    .filter(|f| is_markdown_path(f.path()))
                     .map(|f| f.path().to_owned())
                     .collect();
                 if i.raw.dropped_files.is_empty() {
@@ -2640,7 +1999,7 @@ impl eframe::App for MarkdownApp {
                     egui::ComboBox::from_id_salt("history_selector")
                         .selected_text(
                             self.history
-                                .get(self.history_index)
+                                .current()
                                 .map(|p| p.display().to_string())
                                 .unwrap_or_default(),
                         )
@@ -2648,7 +2007,7 @@ impl eframe::App for MarkdownApp {
                             for (index, path) in self.history.iter().enumerate() {
                                 if ui
                                     .selectable_label(
-                                        index == self.history_index,
+                                        index == self.history.index(),
                                         path.display().to_string(),
                                     )
                                     .clicked()
@@ -3299,139 +2658,176 @@ fn customise_scrollbar(ui: &mut egui::Ui) {
 mod tests {
     use super::*;
 
-    fn temp_dir(name: &str) -> PathBuf {
-        let dir = env::temp_dir().join(format!("workman-test-{}-{name}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).unwrap();
-        dir
-    }
-
-    // ── file_uri_from_str ──────────────────────────────────────────────────────────────
+    // These cover the theme tables that the proc macros bake into the binary.
 
     #[test]
-    fn uri_unix_path() {
+    fn every_bundled_textmate_theme_parses_and_is_listed_once() {
+        let listed = tm_themes();
         assert_eq!(
-            file_uri_from_str("/home/me/doc.md", false),
-            "file:///home/me/doc.md"
+            listed.len(),
+            TM_THEME_MAP.len(),
+            "a bundled .tmTheme failed to parse: {:?}",
+            TM_THEME_MAP
+                .keys()
+                .filter(|k| !listed.iter().any(|(n, _)| n == *k))
+                .collect::<Vec<_>>()
         );
-    }
-
-    #[test]
-    fn uri_encodes_unsafe_characters() {
-        assert_eq!(
-            file_uri_from_str("/a b/c#d/100%/(x).png", false),
-            "file:///a%20b/c%23d/100%25/%28x%29.png"
-        );
-        // Non-ASCII is encoded as UTF-8 bytes.
-        assert_eq!(
-            file_uri_from_str("/na\u{ef}ve", false),
-            "file:///na%C3%AFve"
-        );
+        assert!(listed.len() > 10);
     }
 
     #[test]
-    fn uri_backslash_is_literal_on_unix() {
-        assert_eq!(file_uri_from_str("/a\\b", false), "file:///a%5Cb");
+    fn textmate_theme_list_is_sorted_case_insensitively() {
+        let names: Vec<String> = tm_themes()
+            .iter()
+            .map(|(n, _)| n.to_ascii_lowercase())
+            .collect();
+        let mut sorted = names.clone();
+        sorted.sort();
+        assert_eq!(names, sorted);
     }
 
     #[test]
-    fn uri_windows_drive_path() {
-        assert_eq!(
-            file_uri_from_str(r"C:\Users\me\my doc.md", true),
-            "file:///C:/Users/me/my%20doc.md"
-        );
-    }
-
-    #[test]
-    fn uri_windows_verbatim_prefixes() {
-        assert_eq!(
-            file_uri_from_str(r"\\?\C:\dir\a.md", true),
-            "file:///C:/dir/a.md"
-        );
-        assert_eq!(
-            file_uri_from_str(r"\\?\UNC\server\share\a.md", true),
-            "file://server/share/a.md"
-        );
-        assert_eq!(
-            file_uri_from_str(r"\\server\share\a.md", true),
-            "file://server/share/a.md"
-        );
-    }
-
-    // ── TOC / heading positions ────────────────────────────────────────────────────────
-
-    #[test]
-    fn heading_positions_skip_headings_the_toc_skips() {
-        // A setext heading is reported by pulldown-cmark but is not an ATX heading, so it is
-        // not in the TOC. The headings after it must still be paired with the right slugs
-        // (previously every later heading was shifted by one).
-        let raw = "# One\n\nSetext\n======\n\n> ## Quoted\n\n## Two\n\n### Three\n";
-        let (content, toc) = extract_toc_and_inject_ids(raw);
-        let slugs: Vec<&str> = toc.iter().map(|e| e.slug.as_str()).collect();
-        assert_eq!(slugs, ["one", "quoted", "two", "three"]);
-
-        let positions = content_heading_positions(&content, &toc);
-        assert_eq!(positions.len(), toc.len());
-        for ((start, slug), entry) in positions.iter().zip(&toc) {
-            assert_eq!(slug, &entry.slug);
-            let line = content[*start..].lines().next().unwrap();
-            assert!(
-                line.contains(&format!("{{#{slug}}}")),
-                "line {line:?} should carry {{#{slug}}}"
-            );
+    fn default_code_themes_exist_and_match_their_mode() {
+        for (name, want_dark) in [
+            (DEFAULT_SYNTECT_THEME_DARK, true),
+            (DEFAULT_SYNTECT_THEME_LIGHT, false),
+        ] {
+            let (_, is_dark) = tm_themes()
+                .iter()
+                .find(|(n, _)| *n == name)
+                .unwrap_or_else(|| panic!("default theme {name} is not bundled"));
+            assert_eq!(*is_dark, want_dark, "{name}");
         }
     }
 
     #[test]
-    fn heading_positions_ignore_headings_in_code_fences() {
-        let raw = "```\n# not a heading\n```\n\n# Real\n";
-        let (content, toc) = extract_toc_and_inject_ids(raw);
-        assert_eq!(toc.len(), 1);
-        let positions = content_heading_positions(&content, &toc);
-        assert_eq!(positions.len(), 1);
-        assert_eq!(positions[0].1, "real");
+    fn is_dark_classifies_by_background_and_defaults_to_light() {
+        let theme = |bg: Option<Color>| {
+            let mut t = syntect::highlighting::Theme::default();
+            t.settings.background = bg;
+            t
+        };
+        let rgb = |r, g, b| Color { r, g, b, a: 255 };
+        assert!(is_dark(&theme(Some(rgb(0, 0, 0)))));
+        assert!(!is_dark(&theme(Some(rgb(255, 255, 255)))));
+        assert!(is_dark(&theme(Some(rgb(127, 127, 127)))));
+        assert!(!is_dark(&theme(Some(rgb(129, 129, 129)))));
+        assert!(!is_dark(&theme(None)), "no background means light");
     }
 
-    // ── reading files ──────────────────────────────────────────────────────────────────
-
     #[test]
-    fn oversized_file_is_refused_without_reading_it() {
-        let dir = temp_dir("oversized");
-        let path = dir.join("big.md");
-        // A sparse file: the size check must reject it from metadata alone.
-        fs::File::create(&path)
+    fn every_bundled_base16_theme_is_loaded() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/themes");
+        let files = fs::read_dir(dir)
             .unwrap()
-            .set_len(MAX_BYTES as u64 + 1)
-            .unwrap();
-        let content = read_markdown_file(&path).unwrap();
-        assert!(content.starts_with("# \u{26a0} File Too Large"));
-        assert!(content.contains("big.md"));
-        let _ = fs::remove_dir_all(&dir);
+            .filter_map(Result::ok)
+            .filter(|e| {
+                e.path()
+                    .extension()
+                    .is_some_and(|x| x == "yaml" || x == "yml")
+            })
+            .count();
+        assert_eq!(B16_THEME_MAP.len(), files);
+        assert!(B16_THEME_MAP.len() > 10);
     }
 
     #[test]
-    fn file_at_the_limit_is_read() {
-        let dir = temp_dir("at-limit");
-        let path = dir.join("ok.md");
-        fs::write(&path, vec![b'a'; MAX_BYTES]).unwrap();
-        let content = read_markdown_file(&path).unwrap();
-        assert_eq!(content.len(), MAX_BYTES);
-        let _ = fs::remove_dir_all(&dir);
+    fn shipped_default_config_names_themes_that_exist() {
+        let config: Config =
+            toml::from_str(include_str!("../assets/default_config.toml")).expect("parses");
+        let theming = config.theming;
+        // The directories are placeholders, so the named themes must be built in.
+        let base16 = theming.default_theme.expect("default_theme");
+        assert!(B16_THEME_MAP.contains_key(base16.as_str()), "{base16}");
+        for name in [
+            theming.default_tm_theme_dark.expect("dark"),
+            theming.default_tm_theme_light.expect("light"),
+        ] {
+            assert!(TM_THEME_MAP.contains_key(name.as_str()), "{name}");
+        }
     }
 
     #[test]
-    fn invalid_utf8_is_replaced_not_rejected() {
-        let dir = temp_dir("latin1");
-        let path = dir.join("latin1.md");
-        fs::write(&path, b"caf\xe9\n").unwrap();
-        assert_eq!(read_markdown_file(&path).unwrap(), "caf\u{fffd}\n");
-        let _ = fs::remove_dir_all(&dir);
+    fn dark_or_light_theme_picks_the_default() {
+        assert_eq!(dark_or_light_theme(true), DEFAULT_SYNTECT_THEME_DARK);
+        assert_eq!(dark_or_light_theme(false), DEFAULT_SYNTECT_THEME_LIGHT);
     }
 
     #[test]
-    fn missing_file_is_an_error() {
-        let dir = temp_dir("missing");
-        assert!(read_markdown_file(&dir.join("nope.md")).is_err());
-        let _ = fs::remove_dir_all(&dir);
+    fn resolve_tm_name_table() {
+        let some_builtin = *TM_THEME_MAP.keys().next().unwrap();
+        // Nothing configured: the default for the mode.
+        assert_eq!(
+            resolve_tm_name(None, None, true),
+            DEFAULT_SYNTECT_THEME_DARK
+        );
+        assert_eq!(
+            resolve_tm_name(None, None, false),
+            DEFAULT_SYNTECT_THEME_LIGHT
+        );
+        assert_eq!(
+            resolve_tm_name(None, Some("content"), true),
+            DEFAULT_SYNTECT_THEME_DARK
+        );
+        // A built-in name without external content is used.
+        assert_eq!(
+            resolve_tm_name(Some(some_builtin), None, true),
+            some_builtin
+        );
+        // An unknown name without content falls back to the default.
+        assert_eq!(
+            resolve_tm_name(Some("No Such Theme"), None, true),
+            DEFAULT_SYNTECT_THEME_DARK
+        );
+        assert_eq!(
+            resolve_tm_name(Some("No Such Theme"), None, false),
+            DEFAULT_SYNTECT_THEME_LIGHT
+        );
+        // Name with loaded content is trusted.
+        assert_eq!(
+            resolve_tm_name(Some("My Theme"), Some("<plist/>"), false),
+            "My Theme"
+        );
+    }
+
+    #[test]
+    fn base16_filter_allows() {
+        assert!(Base16Filter::All.allows(true) && Base16Filter::All.allows(false));
+        assert!(Base16Filter::Dark.allows(true) && !Base16Filter::Dark.allows(false));
+        assert!(!Base16Filter::Light.allows(true) && Base16Filter::Light.allows(false));
+        assert!(Base16Filter::default() == Base16Filter::All);
+    }
+
+    #[test]
+    fn welcome_page_has_a_toc_and_no_unfilled_placeholders() {
+        let (_, raw, content, toc) = init_empty()();
+        assert!(!raw.is_empty());
+        assert!(
+            !raw.contains("%{"),
+            "unfilled placeholder in welcome text: {raw}"
+        );
+        assert!(!toc.is_empty());
+        for entry in &toc {
+            assert!(content.contains(&format!("{{#{}}}", entry.slug)));
+        }
+    }
+
+    #[test]
+    fn translations_cover_the_keys_used_for_every_locale() {
+        // A cheap guard against a missing or empty translation: every locale the package
+        // advertises must give a non-empty result that isn't just the key.
+        let locales = [
+            "af", "bg", "ca", "cs", "cy", "da", "de", "el", "en", "es", "fi", "fr", "hr", "hu",
+            "it", "nb", "nl", "pl", "pt", "ro", "ru", "sk", "sl", "st", "sv", "uk", "xh", "zu",
+        ];
+        for locale in locales {
+            for key in ["toolbar.theme_system", "toc.title", "help.window_title"] {
+                let text = rust_i18n::t!(key, locale = locale);
+                assert!(
+                    !text.is_empty() && text != key,
+                    "{locale}: missing translation for {key}"
+                );
+            }
+        }
     }
 }

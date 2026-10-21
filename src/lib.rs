@@ -37,7 +37,12 @@ pub fn get_home_dir_string() -> Result<String, Box<dyn Error>> {
 }
 
 // Positioning it here ensures everything above is registered in the root before the compiler steps inside config.rs.
+pub mod base16_yaml;
+pub mod cli;
 pub mod config;
 
+pub mod history;
 pub mod html_prep;
 pub mod html_render;
+pub mod loader;
+pub mod markdown;

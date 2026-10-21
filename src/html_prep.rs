@@ -837,4 +837,136 @@ mod tests {
         let html_blocks = top_level_blocks(&out).iter().filter(|b| b.html).count();
         assert_eq!(html_blocks, 1, "{out}");
     }
+
+    #[test]
+    fn empty_and_tagless_input_is_unchanged() {
+        assert_eq!(preprocess_html(""), "");
+        assert_eq!(
+            preprocess_html("plain *markdown* only\n"),
+            "plain *markdown* only\n"
+        );
+        assert_eq!(preprocess_html("<"), "<");
+    }
+
+    #[test]
+    fn tags_are_case_insensitive() {
+        let out = preprocess_html(
+            "<B>Bold</B> <I>it</I> <STRONG>s</STRONG> <EM>e</EM> <CODE>c</CODE> <S>x</S> <DEL>d</DEL>\n",
+        );
+        assert_eq!(out, "**Bold** *it* **s** *e* `c` ~~x~~ ~~d~~\n");
+        assert_eq!(preprocess_html("x<br/>y<BR>z\n"), "x\\\ny\\\nz\n");
+    }
+
+    #[test]
+    fn entities_are_left_for_the_markdown_renderer() {
+        let md = "a &amp; b &lt;c&gt; &copy;\n";
+        assert_eq!(preprocess_html(md), md);
+    }
+
+    #[test]
+    fn html_inside_code_spans_is_untouched() {
+        assert_eq!(
+            preprocess_html("`<b>code span</b>` and <b>real</b>\n"),
+            "`<b>code span</b>` and **real**\n"
+        );
+    }
+
+    #[test]
+    fn html_inside_indented_code_is_untouched() {
+        let md = "para\n\n    <b>indented code</b>\n";
+        assert_eq!(preprocess_html(md), md);
+    }
+
+    #[test]
+    fn things_that_are_not_tags_are_left_alone() {
+        for md in [
+            "<<>> <> < b> <3 love\n",
+            "1 < 2 and 3 > 2\n",
+            "Vec<String>\n",
+        ] {
+            assert_eq!(preprocess_html(md), md);
+        }
+    }
+
+    #[test]
+    fn anchors_without_href_lose_their_tag() {
+        assert_eq!(preprocess_html("<a>no href</a>\n"), "no href\n");
+    }
+
+    #[test]
+    fn superscripts_without_a_unicode_form_fall_back_to_a_caret() {
+        assert_eq!(
+            preprocess_html("<sup>1</sup><sub>9</sub>\n"),
+            "\u{b9}\u{2089}\n"
+        );
+        assert_eq!(preprocess_html("x<sup>zz</sup>\n"), "x^(zz)\n");
+    }
+
+    #[test]
+    fn colspan_cells_are_kept_in_their_row() {
+        let out = preprocess_html(
+            "<table><tr><td colspan=\"2\">wide</td></tr><tr><td>a</td><td>b</td></tr></table>\n",
+        );
+        assert!(out.contains("| wide |  |"), "{out}");
+        assert!(out.contains("| a | b |"), "{out}");
+    }
+
+    #[test]
+    fn nested_details_are_merged_into_one_html_block() {
+        let md = "<details><summary>Outer</summary>\n\nbody\n\n<details><summary>Inner</summary>\n\ninner body\n\n</details>\n\n</details>\n";
+        let out = preprocess_html_with(md, false);
+        assert_eq!(out.matches("<details>").count(), 2, "{out}");
+        assert_eq!(out.matches("</details>").count(), 2, "{out}");
+        assert!(out.contains("<p>inner body</p>"), "{out}");
+        assert_eq!(
+            top_level_blocks(&out).iter().filter(|b| b.html).count(),
+            1,
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn unclosed_details_is_passed_through() {
+        let md = "<details>\n";
+        assert_eq!(preprocess_html_with(md, false), md);
+    }
+
+    #[test]
+    fn expanded_details_have_no_html_left() {
+        let out = preprocess_html_with(
+            "<details><summary>S</summary>\n\nbody\n\n</details>\n",
+            true,
+        );
+        assert!(
+            out.contains("**\u{25be} S**") && out.contains("body"),
+            "{out}"
+        );
+        assert!(!out.contains('<'), "{out}");
+    }
+
+    #[test]
+    fn unclosed_and_stray_tags_do_not_panic() {
+        for md in [
+            "<b>unclosed bold\n",
+            "</b> stray close\n",
+            "<img>\n",
+            "<a href=\"x\">never closed\n",
+        ] {
+            let _ = preprocess_html(md);
+        }
+    }
+
+    #[test]
+    fn output_is_stable_when_reprocessed() {
+        for md in [
+            "* **Underline:** <u>This text.</u>\n",
+            "a<br>b\n",
+            "<a href=\"https://x.y\"><img src=\"a b.png\" alt=\"hi\"></a> t\n",
+            "Intro\n\n<table><tr><th>A</th></tr><tr><td>1</td></tr></table>\n\nAfter\n",
+            "```html\n<b>x</b>\n```\n",
+        ] {
+            let once = preprocess_html(md);
+            assert_eq!(preprocess_html(&once), once, "not idempotent for {md:?}");
+        }
+    }
 }

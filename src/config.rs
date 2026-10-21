@@ -472,7 +472,10 @@ mod tests {
         let path = dir.join("config.toml");
         fs::write(&path, "[theming]\ndefault_theme = \"foo\"\n").unwrap();
         let (config, error) = resolve_config(&TestContext(path));
-        assert_eq!(config.unwrap().theming.default_theme.as_deref(), Some("foo"));
+        assert_eq!(
+            config.unwrap().theming.default_theme.as_deref(),
+            Some("foo")
+        );
         assert!(error.is_none());
         let _ = fs::remove_dir_all(&dir);
     }
@@ -509,5 +512,93 @@ mod tests {
     fn config_without_theming_section_is_rejected() {
         assert!(validate_config_format("foo = 1\n").is_err());
         assert!(validate_config_format("[theming]\n").is_ok());
+    }
+
+    #[test]
+    fn shipped_default_config_loads_and_validates() {
+        let dir = temp_dir("default");
+        let path = dir.join("config.toml");
+        fs::write(&path, DEFAULT_CONFIG).unwrap();
+        let config = Config::load(&path).expect("the shipped default config must be valid");
+        assert!(config.theming.default_theme.is_some());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn existing_config_is_never_overwritten() {
+        let dir = temp_dir("keep");
+        let path = dir.join("config.toml");
+        let mine = "[theming]\ndefault_tm_theme_dark = \"Mine\"\n";
+        fs::write(&path, mine).unwrap();
+        let (config, _) = resolve_config(&TestContext(path.clone()));
+        assert_eq!(
+            config.unwrap().theming.default_tm_theme_dark.as_deref(),
+            Some("Mine")
+        );
+        assert_eq!(fs::read_to_string(&path).unwrap(), mine);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn unknown_keys_and_empty_sections_are_tolerated() {
+        let dir = temp_dir("lenient");
+        let path = dir.join("config.toml");
+        fs::write(&path, "[theming]\n").unwrap();
+        assert!(Config::load(&path).is_ok());
+        fs::write(&path, "[theming]\nsome_future_key = 1\n").unwrap();
+        assert!(Config::load(&path).is_ok());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn wrong_types_are_a_parse_error() {
+        let dir = temp_dir("types");
+        let path = dir.join("config.toml");
+        fs::write(&path, "[theming]\ndefault_theme = 42\n").unwrap();
+        assert!(matches!(
+            Config::load(&path),
+            Err(ConfigError::TomlParse(_))
+        ));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn missing_file_is_an_io_error() {
+        assert!(matches!(
+            Config::load(Path::new("/definitely/not/here.toml")),
+            Err(ConfigError::Io(_))
+        ));
+    }
+
+    #[test]
+    fn real_context_path_is_under_base_dir_with_the_package_name() {
+        let ctx = RealContext {
+            base_dir: PathBuf::from("/base"),
+        };
+        assert_eq!(
+            ctx.get_config_path(),
+            Path::new("/base")
+                .join(env!("CARGO_PKG_NAME"))
+                .join("config.toml")
+        );
+        assert!(ctx.is_real());
+    }
+
+    #[test]
+    fn config_round_trips_through_toml() {
+        let config = Config {
+            theming: Theming::new(
+                Some("a".into()),
+                Some("/b".into()),
+                Some("c".into()),
+                Some("d".into()),
+                Some("/e".into()),
+            ),
+        };
+        let text = toml::to_string_pretty(&config).unwrap();
+        let back: Config = toml::from_str(&text).unwrap();
+        assert_eq!(back.theming.default_theme.as_deref(), Some("a"));
+        assert_eq!(back.theming.tm_theme_dir.as_deref(), Some("/e"));
+        assert!(validate_config_format(&text).is_ok());
     }
 }

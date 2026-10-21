@@ -133,7 +133,8 @@ impl Base16 {
 
 fn parse_hex(s: &str) -> Result<Color32, Box<dyn Error>> {
     let h = s.trim().trim_start_matches('#');
-    if h.len() != 6 {
+    // Checking for ASCII hex digits first also makes the byte-index slicing below safe.
+    if h.len() != 6 || !h.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err(format!("expected 6 hex digits, got `{s}`").into());
     }
     let p = |i: usize| u8::from_str_radix(&h[i..i + 2], 16);
@@ -145,4 +146,126 @@ fn luminance(c: Color32) -> f32 {
         f32::from(c.b()),
         0.7152_f32.mul_add(f32::from(c.g()), 0.2126 * f32::from(c.r())),
     ) / 255.0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn palette(indent: &str, bg: &str) -> String {
+        let mut s = String::new();
+        for i in 0..16 {
+            let colour = if i == 0 {
+                bg.to_owned()
+            } else {
+                format!("{:02x}{:02x}{:02x}", i * 10, i * 10, i * 10)
+            };
+            s.push_str(&format!("{indent}base{i:02X}: \"{colour}\"\n"));
+        }
+        s
+    }
+
+    fn old_layout(bg: &str) -> String {
+        format!("scheme: \"Old\"\n{}", palette("", bg))
+    }
+
+    fn new_layout(extra: &str, bg: &str) -> String {
+        format!("name: \"New\"\n{extra}palette:\n{}", palette("  ", bg))
+    }
+
+    #[test]
+    fn old_and_new_layouts_parse() {
+        let old = Base16::from_yaml(&old_layout("101010")).unwrap();
+        assert_eq!(old.name, "Old");
+        assert_eq!(old.c[0], Color32::from_rgb(0x10, 0x10, 0x10));
+        assert_eq!(old.c[1], Color32::from_rgb(10, 10, 10));
+        assert_eq!(old.c[15], Color32::from_rgb(150, 150, 150));
+
+        let new = Base16::from_yaml(&new_layout("", "101010")).unwrap();
+        assert_eq!(new.name, "New");
+        assert_eq!(new.c, old.c);
+    }
+
+    #[test]
+    fn hash_prefixed_colours_are_accepted() {
+        let src = new_layout("", "#ffffff");
+        assert_eq!(Base16::from_yaml(&src).unwrap().c[0], Color32::WHITE);
+    }
+
+    #[test]
+    fn name_defaults_to_base16() {
+        let src = format!("palette:\n{}", palette("  ", "000000"));
+        assert_eq!(Base16::from_yaml(&src).unwrap().name, "base16");
+    }
+
+    #[test]
+    fn variant_wins_over_luminance() {
+        let light_on_black = new_layout("variant: \"light\"\n", "000000");
+        assert!(!Base16::from_yaml(&light_on_black).unwrap().is_dark);
+        let dark_on_white = new_layout("variant: \"dark\"\n", "ffffff");
+        assert!(Base16::from_yaml(&dark_on_white).unwrap().is_dark);
+    }
+
+    #[test]
+    fn darkness_is_inferred_from_the_background() {
+        assert!(Base16::from_yaml(&old_layout("101010")).unwrap().is_dark);
+        assert!(!Base16::from_yaml(&old_layout("f0f0f0")).unwrap().is_dark);
+        // Pure green is bright (luminance ~0.72) even though the red and blue are 0.
+        assert!(!Base16::from_yaml(&old_layout("00ff00")).unwrap().is_dark);
+    }
+
+    #[test]
+    fn missing_colour_is_an_error_naming_it() {
+        let src = old_layout("000000").replace("base0C", "baseXX");
+        let err = Base16::from_yaml(&src).unwrap_err().to_string();
+        assert!(err.contains("base0C"), "{err}");
+    }
+
+    #[test]
+    fn malformed_colours_are_errors_not_panics() {
+        for bad in [
+            "",
+            "fff",
+            "ggggg0",
+            "1234567",
+            "+f0000",
+            "\u{e9}\u{e9}\u{e9}",
+            "a\u{e9}\u{20ac}a",
+        ] {
+            assert!(
+                Base16::from_yaml(&old_layout(bad)).is_err(),
+                "{bad:?} should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn invalid_yaml_is_an_error() {
+        assert!(Base16::from_yaml("{ not: [valid").is_err());
+        assert!(Base16::from_yaml("").is_err());
+    }
+
+    #[test]
+    fn from_file_reports_missing_files() {
+        assert!(Base16::from_file("/definitely/not/here.yaml").is_err());
+    }
+
+    #[test]
+    fn visuals_follow_the_scheme() {
+        let dark = Base16::from_yaml(&old_layout("101010")).unwrap();
+        let v = dark.visuals();
+        assert!(v.dark_mode);
+        assert_eq!(v.panel_fill, dark.c[0]);
+        assert_eq!(v.hyperlink_color, dark.c[0xD]);
+        assert_eq!(v.error_fg_color, dark.c[0x8]);
+
+        let light = Base16::from_yaml(&old_layout("f0f0f0")).unwrap();
+        assert!(!light.visuals().dark_mode);
+    }
+
+    #[test]
+    fn luminance_is_between_zero_and_one() {
+        assert!(luminance(Color32::BLACK).abs() < f32::EPSILON);
+        assert!((luminance(Color32::WHITE) - 1.0).abs() < 1e-4);
+    }
 }
