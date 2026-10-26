@@ -5944,7 +5944,27 @@ dependencies = [
 ]
 
 [[package]]
-name = "workman"
+name = "workman_base16"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+]
+
+[[package]]
+name = "workman_macros"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "inline_colorization",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "syn 3.0.6",
+ "workman_base16",
+]
+
+[[package]]
+name = "workman_md"
 version = "0.1.0"
 dependencies = [
  "chrono",
@@ -5970,28 +5990,8 @@ dependencies = [
  "thiserror 2.0.21",
  "toml 1.1.6+spec-1.1.0",
  "toml_edit 0.25.15+spec-1.1.0",
- "workman-base16",
- "workman-macros",
-]
-
-[[package]]
-name = "workman-base16"
-version = "0.1.0"
-dependencies = [
- "eframe",
-]
-
-[[package]]
-name = "workman-macros"
-version = "0.1.0"
-dependencies = [
- "eframe",
- "inline_colorization",
- "prettyplease",
- "proc-macro2",
- "quote",
- "syn 3.0.6",
- "workman-base16",
+ "workman_base16",
+ "workman_macros",
 ]
 
 [[package]]

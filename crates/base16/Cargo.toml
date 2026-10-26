@@ -1,5 +1,5 @@
 [package]
-name = "workman-base16"
+name = "workman_base16"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

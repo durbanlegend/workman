@@ -1,5 +1,5 @@
 [package]
-name = "workman-macros"
+name = "workman_macros"
 version.workspace = true
 authors.workspace = true
 description = "Procedural macros for the workman project"
@@ -14,7 +14,7 @@ name = "macros"
 proc-macro = true
 
 [dependencies]
-base16 = { package = "workman-base16", path = "../base16", version = "0.1.0" }
+base16 = { package = "workman_base16", path = "../base16", version = "0.1.0" }
 eframe = { workspace = true }
 inline_colorization = "0.1"
 prettyplease = "0.3"

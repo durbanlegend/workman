@@ -4,9 +4,19 @@
 //! Nothing here touches the GUI, which keeps it unit-testable.
 
 use crate::html_prep::preprocess_html_with;
-use pulldown_cmark::{Event, Options, Parser, Tag};
+use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
+
+/// The markdown extensions the viewer renders, which every pre-pass must parse with so that it
+/// sees the same structure as the renderer.
+fn parser_options() -> Options {
+    Options::ENABLE_TABLES
+        | Options::ENABLE_TASKLISTS
+        | Options::ENABLE_STRIKETHROUGH
+        | Options::ENABLE_FOOTNOTES
+        | Options::ENABLE_HEADING_ATTRIBUTES
+}
 
 // ─── TOC / heading extraction ──────────────────────────────────────────────────
 
@@ -91,11 +101,7 @@ pub fn extract_heading_id(line: &str) -> Option<&str> {
 /// blocks that can swallow a code-fence opener — leading to headings that are
 /// unreachable by the scroll mechanism.
 pub fn extract_toc_and_inject_ids(raw: &str) -> (String, Vec<TocEntry>) {
-    let pc_opts = Options::ENABLE_TABLES
-        | Options::ENABLE_TASKLISTS
-        | Options::ENABLE_STRIKETHROUGH
-        | Options::ENABLE_FOOTNOTES
-        | Options::ENABLE_HEADING_ATTRIBUTES;
+    let pc_opts = parser_options();
 
     // Pass 1 — ask pulldown-cmark where headings actually begin.
     let heading_starts: Vec<usize> = Parser::new_ext(raw, pc_opts)
@@ -189,11 +195,7 @@ pub fn extract_toc_and_inject_ids(raw: &str) -> (String, Vec<TocEntry>) {
 /// or lists, whose span doesn't start at the `#`. Those must be skipped here too, using the
 /// same test, or every later heading would be paired with the wrong TOC entry.
 pub fn content_heading_positions(content: &str, toc: &[TocEntry]) -> Vec<(usize, String)> {
-    let opts = Options::ENABLE_TABLES
-        | Options::ENABLE_TASKLISTS
-        | Options::ENABLE_STRIKETHROUGH
-        | Options::ENABLE_FOOTNOTES
-        | Options::ENABLE_HEADING_ATTRIBUTES;
+    let opts = parser_options();
     let mut entries = toc.iter();
     let mut positions = Vec::with_capacity(toc.len());
     for (event, span) in Parser::new_ext(content, opts).into_offset_iter() {
@@ -337,71 +339,137 @@ pub fn file_uri_from_str(raw: &str, windows: bool) -> String {
 // ─── Code fence pre-screening ────────────────────────────────────────────────
 
 /// A code-fence problem detected before rendering.
+#[derive(Debug, PartialEq, Eq)]
 pub enum FenceError {
-    /// Total fence boundary count is odd — at least one fence is unclosed.
-    OddCount { total: usize },
-    /// An even-numbered boundary carries a language tag, meaning the preceding
-    /// typed opener was never closed.
-    UnclosedBeforeTyped {
+    /// A fence is never closed, so it swallows the rest of the document (or of its block
+    /// quote or list item).
+    Unclosed {
+        /// 1-based line of the opening fence.
         at_line: usize,
-        at_header: String,
-        prev_typed: Option<(usize, String)>,
+        /// The opening fence line, e.g. ```` ```rust ````.
+        header: String,
+    },
+    /// A fence contains what looks like another fence opener (a fence of the same kind and at
+    /// least the same length, with a language tag), which almost always means the first fence
+    /// was never closed and the rest of the text was swallowed into it.
+    NestedOpener {
+        /// 1-based line and text of the outer opening fence.
+        opener: (usize, String),
+        /// 1-based line and text of the suspicious inner line.
+        inner: (usize, String),
     },
 }
 
-/// Scan `content` for fence problems without a full parser.
+/// Checks that every fenced code block in `content` is properly closed.
 ///
-/// A fence boundary is a line with ≤ 3 leading spaces that starts with a triple backtick
-/// or triple tilde (`~~~`) (matching the same rule used by `extract_toc_and_inject_ids`).
+/// pulldown-cmark decides what is a fence (so fences inside other fences, indented code, HTML
+/// blocks and so on are handled exactly as the renderer will handle them), and this only
+/// inspects the blocks it found. Two problems are reported:
 ///
-/// Two invariants are checked:
-/// - **(a)** Total boundary count must be even — odd means at least one unclosed.
-/// - **(b)** Every *typed* boundary (one with a language tag) must be
-///   odd-numbered in sequence; an even-numbered typed boundary means the
-///   previous typed opener was never closed.
+/// - a fence that never gets a closing line (`CommonMark` closers are the same character,
+///   at least as long as the opener, with nothing after them), and
+/// - a fence that contains a line like a typed opener (see [`FenceError::NestedOpener`]),
+///   the typical symptom of a forgotten closer, where the renderer would otherwise silently
+///   produce a mangled page.
+///
+/// # Errors
+///
+/// Returns the first problem found, in document order.
 pub fn validate_code_fences(content: &str) -> Result<(), FenceError> {
-    let mut fence_count = 0usize;
-    let mut last_typed: Option<(usize, String)> = None;
+    let line_of = |offset: usize| content[..offset].matches('\n').count() + 1;
 
-    for (idx, line) in content.lines().enumerate() {
-        let line_num = idx + 1;
-        let trimmed = line.trim_start_matches(' ');
-        if line.len() - trimmed.len() > 3 {
+    for (event, span) in Parser::new_ext(content, parser_options()).into_offset_iter() {
+        let Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(_))) = event else {
             continue;
-        }
-        let is_backtick = trimmed.starts_with("```");
-        let is_tilde = trimmed.starts_with("~~~");
-        if !is_backtick && !is_tilde {
+        };
+        let block = &content[span.clone()];
+        let mut lines = block.split('\n');
+        let header_line = lines.next().unwrap_or("");
+        let header = header_line.trim_end();
+        let Some((fence_char, open_len)) = fence_of(header_line) else {
             continue;
-        }
+        };
+        let body: Vec<&str> = lines.collect();
+        // Bytes of block-quote markers / list indentation before the fence on its line.
+        let container_len = span.start - content[..span.start].rfind('\n').map_or(0, |i| i + 1);
 
-        fence_count += 1;
-
-        // Strip all leading fence chars to get the language tag (if any).
-        let lang = if is_backtick {
-            trimmed.trim_start_matches('`')
-        } else {
-            trimmed.trim_start_matches('~')
-        }
-        .trim();
-
-        if !lang.is_empty() {
-            if fence_count.is_multiple_of(2) {
-                // Even-numbered typed boundary → previous opener was never closed.
-                return Err(FenceError::UnclosedBeforeTyped {
-                    at_line: line_num,
-                    at_header: trimmed.trim_end().to_string(),
-                    prev_typed: last_typed,
+        // A typed opener inside the block means the outer fence was probably never closed.
+        for (i, line) in body.iter().enumerate() {
+            if is_typed_opener(line, fence_char, open_len, container_len) {
+                return Err(FenceError::NestedOpener {
+                    opener: (line_of(span.start), header.to_owned()),
+                    inner: (
+                        line_of(span.start) + 1 + i,
+                        strip_container(line).trim_end().to_owned(),
+                    ),
                 });
             }
-            last_typed = Some((line_num, trimmed.trim_end().to_string()));
+        }
+
+        // pulldown-cmark's span ends at the closing fence if there is one, but includes the
+        // trailing newline(s) if the block ran to the end of its container unclosed.
+        let closed = body
+            .last()
+            .is_some_and(|last| is_closer(last, fence_char, open_len));
+        if !closed {
+            return Err(FenceError::Unclosed {
+                at_line: line_of(span.start),
+                header: header.to_owned(),
+            });
         }
     }
-
-    if !fence_count.is_multiple_of(2) {
-        return Err(FenceError::OddCount { total: fence_count });
-    }
     Ok(())
+}
+
+/// Removes the leading indentation and block-quote markers that can precede a fence line.
+fn strip_container(line: &str) -> &str {
+    line.trim_start_matches(|c: char| c == '>' || c.is_whitespace())
+}
+
+/// The fence character and length of an opening fence line.
+fn fence_of(line: &str) -> Option<(char, usize)> {
+    let line = strip_container(line);
+    let ch = line.chars().next().filter(|c| matches!(c, '`' | '~'))?;
+    let len = line.chars().take_while(|&c| c == ch).count();
+    (len >= 3).then_some((ch, len))
+}
+
+/// Whether `line` closes a fence of `fence_char` opened with `open_len` of them.
+fn is_closer(line: &str, fence_char: char, open_len: usize) -> bool {
+    let t = strip_container(line).trim_end();
+    t.chars().count() >= open_len && t.chars().all(|c| c == fence_char)
+}
+
+/// Whether `line` looks like the opening of a new fence with a language tag, of the same kind
+/// as (and at least as long as) the enclosing one.
+///
+/// This is deliberately conservative, because a false alarm replaces a perfectly good document
+/// with an error page. The line must be indented by at most three spaces beyond its container
+/// (`container_len` is how many bytes of block-quote markers or list indentation precede the
+/// outer fence; more indentation than that is content, not a fence), and the info string must
+/// be a single language-like word (`rust`, `c++`, `objective-c`).
+fn is_typed_opener(line: &str, fence_char: char, open_len: usize, container_len: usize) -> bool {
+    // Drop the container prefix, which is spaces and `>` markers.
+    let mut rest = line;
+    for _ in 0..container_len {
+        match rest.strip_prefix([' ', '>']) {
+            Some(r) => rest = r,
+            None => break,
+        }
+    }
+    let t = rest.trim_start_matches(' ');
+    if rest.len() - t.len() > 3 {
+        return false;
+    }
+    let len = t.chars().take_while(|&c| c == fence_char).count();
+    if len < open_len {
+        return false;
+    }
+    let info = t[len * fence_char.len_utf8()..].trim();
+    !info.is_empty()
+        && info
+            .chars()
+            .all(|c| c.is_alphanumeric() || matches!(c, '+' | '#' | '.' | '-' | '_'))
 }
 
 /// Pre-screens `raw` for malformed code fences. Returns it unchanged if it's fine, otherwise
@@ -418,61 +486,47 @@ pub fn screen_code_fences(raw: String, path: &Path, mod_key: &str) -> String {
 }
 
 /// Return a one-line description of a fence error suitable for `eprintln!`.
+#[must_use]
 pub fn fence_err_brief(err: &FenceError, path: &Path) -> String {
     let p = path.display();
     match err {
-        FenceError::OddCount { total } => {
-            format!("malformed code fence in '{p}': odd boundary count ({total} total)")
+        FenceError::Unclosed { at_line, header } => {
+            format!("malformed code fence in '{p}': '{header}' (line {at_line}) is never closed")
         }
-        FenceError::UnclosedBeforeTyped {
-            at_line,
-            at_header,
-            prev_typed,
-        } => match prev_typed {
-            Some((pl, ph)) => format!(
-                "malformed code fence in '{p}': unclosed fence between \
-                     '{ph}' (line {pl}) and '{at_header}' (line {at_line})"
-            ),
-            None => format!(
-                "malformed code fence in '{p}': unclosed fence before \
-                     '{at_header}' (line {at_line})"
-            ),
-        },
+        FenceError::NestedOpener {
+            opener: (ol, oh),
+            inner: (il, ih),
+        } => format!(
+            "malformed code fence in '{p}': unclosed fence between \
+             '{oh}' (line {ol}) and '{ih}' (line {il})"
+        ),
     }
 }
 
 /// Build a markdown error page to display instead of a broken file.
 /// The error renders nicely in the viewer; the user can fix the file and
 /// press `mod_key`-R (Cmd/Ctrl-R) to reload.
+#[must_use]
 pub fn fence_error_content(path: &Path, err: &FenceError, mod_key: &str) -> String {
     let file = path.display();
-    match err {
-        FenceError::OddCount { total } => format!(
-            "# \u{26a0} Malformed Code Fence\n\n\
-             Cannot render `{file}`.\n\n\
-             **Odd number of fence boundaries detected ({total} total)** \u{2014} \
-             at least one code fence is unclosed.\n\n\
-             Please fix the file, then press **{mod_key}-R** to reload."
-        ),
-        FenceError::UnclosedBeforeTyped {
-            at_line,
-            at_header,
-            prev_typed,
-        } => {
-            let location = match prev_typed {
-                Some((pl, ph)) => {
-                    format!("between `{ph}` on line {pl} and `{at_header}` on line {at_line}")
-                }
-                None => format!("before `{at_header}` on line {at_line}"),
-            };
-            format!(
-                "# \u{26a0} Malformed Code Fence\n\n\
-                 Cannot render `{file}`.\n\n\
-                 **Unclosed code fence detected** \u{2014} {location}.\n\n\
-                 Please fix the file, then press **{mod_key}-R** to reload."
-            )
+    let problem = match err {
+        FenceError::Unclosed { at_line, header } => {
+            format!("`{header}` on line {at_line} is never closed.")
         }
-    }
+        FenceError::NestedOpener {
+            opener: (ol, oh),
+            inner: (il, ih),
+        } => format!(
+            "between `{oh}` on line {ol} and `{ih}` on line {il}, a code fence was probably \
+             left unclosed."
+        ),
+    };
+    format!(
+        "# \u{26a0} Malformed Code Fence\n\n\
+         Cannot render `{file}`.\n\n\
+         **Unclosed code fence detected** \u{2014} {problem}\n\n\
+         Please fix the file, then press **{mod_key}-R** to reload."
+    )
 }
 
 #[cfg(test)]
@@ -893,86 +947,167 @@ mod tests {
 
     // ── code fences ────────────────────────────────────────────────────────────────────
 
+    fn unclosed(at_line: usize, header: &str) -> FenceError {
+        FenceError::Unclosed {
+            at_line,
+            header: header.to_owned(),
+        }
+    }
+
     #[test]
     fn fences_balanced_are_ok() {
-        assert!(validate_code_fences("").is_ok());
-        assert!(validate_code_fences("no fences").is_ok());
-        assert!(validate_code_fences("```rust\ncode\n```\n").is_ok());
-        assert!(validate_code_fences("```\na\n```\n\n~~~\nb\n~~~\n").is_ok());
-        assert!(validate_code_fences("```rust\na\n```\n```toml\nb\n```\n").is_ok());
-        assert!(
-            validate_code_fences("   ```\n   a\n   ```\n").is_ok(),
-            "up to 3 spaces"
+        for doc in [
+            "",
+            "no fences",
+            "```rust\ncode\n```\n",
+            "```rust\ncode\n```",
+            "```\na\n```\n\n~~~\nb\n~~~\n",
+            "```rust\na\n```\n```toml\nb\n```\n",
+            "   ```\n   a\n   ```\n",
+            "```\n\n\n```\n",
+            "```\n```\n",
+        ] {
+            assert_eq!(validate_code_fences(doc), Ok(()), "{doc:?}");
+        }
+    }
+
+    #[test]
+    fn fences_unclosed_at_end_of_document() {
+        assert_eq!(validate_code_fences("```\ncode\n"), Err(unclosed(1, "```")));
+        assert_eq!(validate_code_fences("```"), Err(unclosed(1, "```")));
+        assert_eq!(validate_code_fences("```\n"), Err(unclosed(1, "```")));
+        assert_eq!(
+            validate_code_fences("text\n\n~~~rust\nfn a() {}"),
+            Err(unclosed(3, "~~~rust"))
+        );
+        assert_eq!(
+            validate_code_fences("```rust\nx\n\n\n"),
+            Err(unclosed(1, "```rust"))
         );
     }
 
     #[test]
-    fn fences_odd_count_is_reported() {
-        match validate_code_fences("```\ncode\n") {
-            Err(FenceError::OddCount { total }) => assert_eq!(total, 1),
-            other => panic!(
-                "unexpected {:?}",
-                other.err().map(|e| fence_err_brief(&e, Path::new("x")))
-            ),
-        }
+    fn fences_forgotten_closer_before_a_typed_opener_is_reported_with_locations() {
+        let doc = "```rust\nfn a() {}\n\n```toml\nx = 1\n```\n";
+        assert_eq!(
+            validate_code_fences(doc),
+            Err(FenceError::NestedOpener {
+                opener: (1, "```rust".to_owned()),
+                inner: (4, "```toml".to_owned()),
+            })
+        );
     }
 
     #[test]
-    fn fences_unclosed_typed_opener_is_reported_with_locations() {
-        let doc = "```rust\nfn a() {}\n\n```toml\nx = 1\n```\n";
-        match validate_code_fences(doc) {
-            Err(FenceError::UnclosedBeforeTyped {
-                at_line,
-                at_header,
-                prev_typed,
-            }) => {
-                assert_eq!(at_line, 4);
-                assert_eq!(at_header, "```toml");
-                assert_eq!(prev_typed, Some((1, "```rust".to_owned())));
-            }
-            _ => panic!("expected UnclosedBeforeTyped"),
-        }
+    fn fences_closer_with_trailing_text_does_not_close() {
+        // "``` trailing" can't close the fence, and looks like an opener, so it is reported
+        // as such, with both locations.
+        assert_eq!(
+            validate_code_fences("```\ncode\n``` trailing\n"),
+            Err(FenceError::NestedOpener {
+                opener: (1, "```".to_owned()),
+                inner: (3, "``` trailing".to_owned()),
+            })
+        );
+    }
+
+    #[test]
+    fn fences_closer_must_be_at_least_as_long_as_the_opener() {
+        assert_eq!(
+            validate_code_fences("````\ncode\n```\n"),
+            Err(unclosed(1, "````"))
+        );
+        assert_eq!(validate_code_fences("```\ncode\n`````\n"), Ok(()));
+    }
+
+    #[test]
+    fn fences_closer_must_use_the_same_character() {
+        assert_eq!(
+            validate_code_fences("~~~\ncode\n```\n"),
+            Err(unclosed(1, "~~~"))
+        );
     }
 
     #[test]
     fn fences_indented_four_spaces_are_not_fences() {
-        assert!(validate_code_fences("    ```\n    code\n").is_ok());
+        assert_eq!(validate_code_fences("    ```\n    code\n"), Ok(()));
+    }
+
+    #[test]
+    fn fences_inside_block_quotes_and_lists() {
+        assert_eq!(
+            validate_code_fences("> ```rust\n> x\n> ```\n\nafter\n"),
+            Ok(())
+        );
+        assert_eq!(
+            validate_code_fences("- item\n  ```rust\n  x\n  ```\n- next\n"),
+            Ok(())
+        );
+        assert_eq!(
+            validate_code_fences("- item\n  ```rust\n  x\n\n- next\n"),
+            Err(unclosed(2, "```rust"))
+        );
+    }
+
+    #[test]
+    fn fences_text_that_is_not_a_fence_is_ignored() {
+        for doc in [
+            "``` not `a fence` because of the backtick\n",
+            "inline ```code``` here\n",
+            "``\nnot enough\n``\n",
+            "~~ two tildes\n",
+        ] {
+            assert_eq!(validate_code_fences(doc), Ok(()), "{doc:?}");
+        }
+    }
+
+    #[test]
+    fn fences_backticks_inside_tilde_fence_are_content() {
+        assert_eq!(validate_code_fences("~~~\n```\n~~~\n"), Ok(()));
+        assert_eq!(validate_code_fences("~~~\n```rust\nx\n```\n~~~\n"), Ok(()));
+    }
+
+    #[test]
+    fn fences_longer_outer_fence_may_contain_shorter_ones() {
+        assert_eq!(
+            validate_code_fences("````md\n```rust\nx\n```\n````\n"),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn fences_first_problem_in_document_order_wins() {
+        let doc = "```a\nx\n```\n\n```b\nunclosed\n";
+        assert_eq!(validate_code_fences(doc), Err(unclosed(5, "```b")));
     }
 
     #[test]
     fn fence_error_messages_mention_the_file_and_key() {
         let path = Path::new("/tmp/doc.md");
-        let odd = FenceError::OddCount { total: 3 };
-        assert!(fence_err_brief(&odd, path).contains("/tmp/doc.md"));
-        assert!(fence_err_brief(&odd, path).contains("3 total"));
-        let page = fence_error_content(path, &odd, "Cmd");
+        let open = unclosed(7, "```rust");
+        let brief = fence_err_brief(&open, path);
+        assert!(
+            brief.contains("/tmp/doc.md") && brief.contains("line 7"),
+            "{brief}"
+        );
+        let page = fence_error_content(path, &open, "Cmd");
         assert!(page.starts_with("# \u{26a0} Malformed Code Fence"));
         assert!(page.contains("`/tmp/doc.md`"));
+        assert!(page.contains("````rust` on line 7"), "{page}");
         assert!(page.contains("**Cmd-R**"));
 
-        let typed = FenceError::UnclosedBeforeTyped {
-            at_line: 9,
-            at_header: "```toml".into(),
-            prev_typed: Some((2, "```rust".into())),
+        let nested = FenceError::NestedOpener {
+            opener: (2, "```rust".into()),
+            inner: (9, "```toml".into()),
         };
-        let brief = fence_err_brief(&typed, path);
+        let brief = fence_err_brief(&nested, path);
         assert!(
             brief.contains("line 2") && brief.contains("line 9"),
             "{brief}"
         );
-        assert!(fence_error_content(path, &typed, "Ctrl").contains("**Ctrl-R**"));
-
-        let first = FenceError::UnclosedBeforeTyped {
-            at_line: 5,
-            at_header: "```c".into(),
-            prev_typed: None,
-        };
-        assert!(fence_err_brief(&first, path).contains("before"));
-        let page = fence_error_content(path, &first, "Ctrl");
-        assert!(
-            page.contains("before `") && page.contains("on line 5"),
-            "{page}"
-        );
+        let page = fence_error_content(path, &nested, "Ctrl");
+        assert!(page.contains("line 2") && page.contains("line 9"), "{page}");
+        assert!(page.contains("**Ctrl-R**"));
     }
 
     #[test]
@@ -984,18 +1119,65 @@ mod tests {
         assert!(bad.starts_with("# \u{26a0} Malformed Code Fence"));
     }
 
-    // Known weaknesses of the fence pre-screen (it counts markers rather than parsing).
-    // These documents are valid CommonMark, yet would be replaced by the error page.
-
     #[test]
-    #[ignore = "known issue: a ``` line inside a ~~~ fence is counted as a boundary"]
-    fn fences_backticks_inside_tilde_fence_are_content() {
-        assert!(validate_code_fences("~~~\n```\n~~~\n").is_ok());
+    fn fences_indented_inner_fence_is_content_not_an_opener() {
+        // From TEST_CASES.md: the inner fence is indented to show it literally.
+        let doc = "```html\n<details>\n    <summary>x</summary>\n\n    ```bash\n    Error\n    ```\n</details>\n```\n";
+        assert_eq!(validate_code_fences(doc), Ok(()));
     }
 
     #[test]
-    #[ignore = "known issue: fence length is not tracked, so a longer outer fence is misread"]
-    fn fences_longer_outer_fence_may_contain_shorter_ones() {
-        assert!(validate_code_fences("````md\n```rust\nx\n```\n````\n").is_ok());
+    fn fences_info_must_look_like_a_language_to_count_as_an_opener() {
+        // A Rust sample that happens to contain "```" followed by escapes or prose.
+        for inner in [
+            "```\\n\\",
+            "``` ([#2315](https://x/y))",
+            "```rs path/to/file.rs",
+            "``` and more words",
+        ] {
+            let doc = format!("```rust\nlet s = 1;\n{inner}\n```\n");
+            assert!(
+                !matches!(
+                    validate_code_fences(&doc),
+                    Err(FenceError::NestedOpener { .. })
+                ),
+                "{inner:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn fences_language_like_tokens_are_openers() {
+        for lang in [
+            "rust",
+            "c++",
+            "c#",
+            "objective-c",
+            "sh",
+            "R",
+            "x86_64",
+            "tar.gz",
+        ] {
+            let doc = format!("```text\nabc\n```{lang}\nmore\n```\n");
+            assert!(
+                matches!(
+                    validate_code_fences(&doc),
+                    Err(FenceError::NestedOpener { .. })
+                ),
+                "{lang}"
+            );
+        }
+    }
+
+    #[test]
+    fn fences_nested_opener_inside_a_quote_or_list_is_still_found() {
+        assert!(matches!(
+            validate_code_fences("> ```rust\n> a\n> ```toml\n> b\n> ```\n"),
+            Err(FenceError::NestedOpener { .. })
+        ));
+        assert!(matches!(
+            validate_code_fences("- x\n  ```rust\n  a\n  ```toml\n  b\n  ```\n"),
+            Err(FenceError::NestedOpener { .. })
+        ));
     }
 }

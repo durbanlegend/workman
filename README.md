@@ -62,16 +62,24 @@ Please report any mistakes in the AI-provided translations as issues on the `wor
 macOS and Linux:
 
 ```sh
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/durbanlegend/workman/releases/latest/download/workman-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/durbanlegend/workman/releases/latest/download/workman_md-installer.sh | sh
 ```
 
 Windows (PowerShell):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -c "irm https://github.com/durbanlegend/workman/releases/latest/download/workman-installer.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/durbanlegend/workman/releases/latest/download/workman_md-installer.ps1 | iex"
 ```
 
 Or download an archive for your platform from the [releases page](https://github.com/durbanlegend/workman/releases).
+
+### From crates.io
+
+```sh
+cargo install workman_md
+```
+
+The installed command is `workman`.
 
 ### From source
 

@@ -55,9 +55,13 @@ fn readme_survives_the_pipeline() {
 }
 
 #[test]
-fn readme_code_fences_are_balanced() {
-    let doc = fs::read_to_string(root().join("README.md")).unwrap();
-    assert!(validate_code_fences(&doc).is_ok());
+fn bundled_documents_have_well_formed_code_fences() {
+    // TEST_CASES.md shows fences inside fences (indented), which the validator must not
+    // mistake for a forgotten closer.
+    for name in ["README.md", "TEST_CASES.md"] {
+        let doc = fs::read_to_string(root().join(name)).unwrap();
+        assert_eq!(validate_code_fences(&doc), Ok(()), "{name}");
+    }
 }
 
 #[test]

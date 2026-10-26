@@ -1,5 +1,5 @@
 [package]
-name = "workman"
+name = "workman_md"
 version.workspace = true   # Inherits version 0.1.0 from the root
 edition.workspace = true   # Inherits the Rust 2024 Edition
 authors.workspace = true   # Inherits your author info
@@ -44,12 +44,18 @@ available-locales = ["af", "bg", "ca", "cs", "cy", "da", "de", "el", "en", "es",
 default-locale = "en"
 load-path = "locales"
 
+# The library keeps the short name used in `use workman::...`, and the binary is `workman`,
+# whatever the package is called on crates.io.
+[lib]
+name = "workman"
+path = "src/lib.rs"
+
 [[bin]]
 name = "workman"
 path = "src/main.rs"
 
 [dependencies]
-base16 = { package = "workman-base16", path = "crates/base16", version = "0.1.0" }
+base16 = { package = "workman_base16", path = "crates/base16", version = "0.1.0" }
 chrono = "0.4"
 dirs = "7"
 eframe = { version = "0.37", features = ["wgpu"] }
@@ -59,7 +65,7 @@ egui_extras = { version = "0.37", features = ["svg", "syntect"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 fontdb = { version = "0.23", features = ["fs"] }
 log = "0.4"
-macros = { package = "workman-macros", path = "crates/macros", version = "0.1.0" }
+macros = { package = "workman_macros", path = "crates/macros", version = "0.1.0" }
 notify = "8"
 phf = { version = "0.14", features = ["macros"] }
 pulldown-cmark = "0.13"

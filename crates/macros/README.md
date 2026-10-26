@@ -1,4 +1,4 @@
-# workman-macros
+# workman_macros
 
 Internal procedural macros for the [workman](https://github.com/durbanlegend/workman) markdown
 viewer: they embed the bundled Base16 and TextMate themes into the binary at compile time.
