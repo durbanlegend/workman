@@ -51,7 +51,6 @@ use workman::config::{self, Config, Context, RealContext, maybe_config};
 //# Option: --search-collapsible (-s): Expand collapsible widgets to make them searchable.
 //# Option: --version (-V): Print version number and exit.
 //# Argument: [PATH]: Optional initial markdown file to open
-use workman::base16_yaml::parse_base16_yaml;
 use workman::cli::{self, FileArg, detect_locale, is_markdown_path};
 use workman::history::History;
 use workman::html_render::HtmlRenderer;
@@ -344,7 +343,7 @@ fn main() -> eframe::Result<()> {
     if env::args().skip(1).any(|a| a == "--version" || a == "-V") {
         println!(
             "{} version {}",
-            env!("CARGO_PKG_NAME"),
+            workman::APP_NAME,
             env!("CARGO_PKG_VERSION")
         );
         return Ok(());
@@ -1458,7 +1457,13 @@ impl MarkdownApp {
                 let mut save_error: Option<String> = None;
                 ui.horizontal(|ui| {
                     ui.label(t!("themes.save_label"));
-                    let path = RealContext::new().get_config_path();
+                    let Some(path) = RealContext::new().map(|ctx| ctx.get_config_path()) else {
+                        ui.colored_label(
+                            ui.visuals().error_fg_color,
+                            "Cannot locate the configuration directory",
+                        );
+                        return;
+                    };
                     if ui
                         .button(t!("themes.save_button"))
                         .on_hover_text(t!("themes.save_tip"))
@@ -1551,13 +1556,7 @@ impl MarkdownApp {
             return (None, None); // cancelled
         };
 
-        let stem = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("custom");
-        let result = fs::read_to_string(&path)
-            .map_err(|e| e.to_string())
-            .and_then(|src| parse_base16_yaml(&src, stem));
+        let result = Base16::from_file(&path);
 
         match result {
             Ok(theme) => (Some(path), Some(self.add_to_loaded_themes(theme))),

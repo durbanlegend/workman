@@ -1,40 +1,51 @@
 #![allow(clippy::module_name_repetitions)]
 use base16::Base16;
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use quote::quote;
-use std::env;
+use std::{env, path::Path};
 
 pub fn preload_base16_themes_impl(_input: TokenStream) -> TokenStream {
-    // eprintln!("\ncurrent_dir={:?}", env::current_dir());
-    let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
-    // eprintln!("The project manifest directory is: {manifest_dir}");
-    let themes_dir = manifest_dir + "/assets/themes";
-    // let themes_dir = "/Users/donf/projects/schemes-spec-0.11/base16/";
+    expand().unwrap_or_else(|e| e.to_compile_error().into())
+}
+
+fn expand() -> Result<TokenStream, syn::Error> {
+    let fail = |msg: String| syn::Error::new(Span::call_site(), msg);
+
+    let manifest_dir =
+        env::var("CARGO_MANIFEST_DIR").map_err(|_| fail("CARGO_MANIFEST_DIR is not set".into()))?;
+    let themes_dir = Path::new(&manifest_dir).join("assets/themes");
+
+    let mut paths: Vec<_> = std::fs::read_dir(&themes_dir)
+        .map_err(|e| fail(format!("cannot read {}: {e}", themes_dir.display())))?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        // Skip hidden files like .DS_Store and read only `.yaml` files
+        .filter(|path| {
+            path.file_name().and_then(|n| n.to_str()).is_some_and(|n| {
+                !n.starts_with('.')
+                    && Path::new(n)
+                        .extension()
+                        .is_some_and(|ext| ext.eq_ignore_ascii_case("yaml"))
+            })
+        })
+        .collect();
+    // A stable order keeps the generated code (and so the build) reproducible.
+    paths.sort();
 
     let mut theme_mappings = Vec::new();
-
-    for entry in std::fs::read_dir(themes_dir).unwrap() {
-        let path = entry.unwrap().path();
-        // Skip hidden files like .DS_Store and read only `.yaml` files
-        if path.file_name().and_then(|n| n.to_str()).is_none_or(|n| {
-            n.starts_with('.')
-                || !std::path::Path::new(n)
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("yaml"))
-        }) {
-            continue;
-        }
-
-        let theme = Base16::from_file(&path).unwrap_or_else(|e| {
-            eprintln!("failed to load {}: {e}", path.display());
-            std::process::exit(1);
-        });
-
-        let key = &path.file_stem().unwrap().to_string_lossy().into_owned();
+    for path in paths {
+        let theme = Base16::from_file(&path)
+            .map_err(|e| fail(format!("failed to load {}: {e}", path.display())))?;
+        let key = path
+            .file_stem()
+            .ok_or_else(|| fail(format!("{} has no file name", path.display())))?
+            .to_string_lossy()
+            .into_owned();
         let name = theme.name;
         let is_dark: bool = theme.is_dark;
 
-        // 1. Map each Color32 in the array to a tokenized constructor expression
+        // Map each Color32 in the array to a tokenized constructor expression
         let color_tokens: Vec<_> = theme
             .c
             .iter()
@@ -46,20 +57,16 @@ pub fn preload_base16_themes_impl(_input: TokenStream) -> TokenStream {
             })
             .collect();
 
-        // 2. Interpolate the expanded array tokens into the struct literal
-        let theme_mapping = quote! {
+        theme_mappings.push(quote! {
             #key => Base16 {
                 name: #name,
                 is_dark: #is_dark,
                 c: [ #(#color_tokens),* ],
             }
-        };
-        theme_mappings.push(theme_mapping);
+        });
     }
 
-    // eprintln!("Done!");
-
-    quote! {
+    Ok(quote! {
         /// A static Map that maps theme names from `.yaml` `Base16` files to the
         /// `Base16` content that we use for theming the documents.
         /// (Note that this does not apply to code blocks, which are higlighted by
@@ -68,5 +75,5 @@ pub fn preload_base16_themes_impl(_input: TokenStream) -> TokenStream {
                 #(#theme_mappings),*
             };
     }
-    .into()
+    .into())
 }

@@ -1,3 +1,7 @@
+/// The application's name. Used for the config directory and `--version`, so that renaming the
+/// package on crates.io doesn't move users' configuration.
+pub const APP_NAME: &str = "workman";
+
 use crate::config::ConfigError;
 use std::error::Error;
 
@@ -37,7 +41,6 @@ pub fn get_home_dir_string() -> Result<String, Box<dyn Error>> {
 }
 
 // Positioning it here ensures everything above is registered in the root before the compiler steps inside config.rs.
-pub mod base16_yaml;
 pub mod cli;
 pub mod config;
 

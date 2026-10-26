@@ -1,6 +1,52 @@
+//! Base16 colour schemes for egui.
+//!
+//! Parses Base16 / tinted-theming scheme files (without a YAML library) and turns them into
+//! egui [`Visuals`].
+//!
+//! Two layouts are understood:
+//!
+//! * old: `scheme: "Name"` / `base00: "181818"` ...
+//! * new: `name: "Name"` / `variant: "dark"` / `palette:` with `base00: "181818"` ...
+//!
+//! Only flat `key: value` lines are read, which covers every published scheme file. Extra keys
+//! (such as the `base10`..`base17` of Base24 schemes) are ignored.
+
 use eframe::egui;
 use egui::{Color32, Stroke, Visuals};
-use std::{error::Error, fs, path::Path};
+use std::{error::Error, fmt, fs, io, path::Path};
+
+/// Why a scheme couldn't be loaded.
+#[derive(Debug)]
+pub enum Base16Error {
+    /// The file couldn't be read.
+    Io(io::Error),
+    /// The text isn't a usable scheme.
+    Parse(String),
+}
+
+impl fmt::Display for Base16Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Io(e) => write!(f, "{e}"),
+            Self::Parse(msg) => write!(f, "{msg}"),
+        }
+    }
+}
+
+impl Error for Base16Error {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::Io(e) => Some(e),
+            Self::Parse(_) => None,
+        }
+    }
+}
+
+impl From<io::Error> for Base16Error {
+    fn from(e: io::Error) -> Self {
+        Self::Io(e)
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Base16 {
@@ -11,42 +57,88 @@ pub struct Base16 {
 }
 
 impl Base16 {
+    /// Loads a scheme from a file. A scheme without a name is called after the file.
+    ///
     /// # Errors
-    /// Will bubble up any errors encountered reading the file from disk.
-    pub fn from_file(path: impl AsRef<Path>) -> Result<Self, Box<dyn Error>> {
-        Self::from_yaml(&fs::read_to_string(path)?)
+    /// Fails if the file can't be read or isn't a usable scheme.
+    pub fn from_file(path: impl AsRef<Path>) -> Result<Self, Base16Error> {
+        let path = path.as_ref();
+        let stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("base16");
+        Self::from_yaml_named(&fs::read_to_string(path)?, stem)
     }
 
+    /// Parses a scheme; one without a name is called `base16`.
+    ///
     /// # Errors
-    /// Will bubble up any errors encountered parsing the `YAML` file.
-    pub fn from_yaml(src: &str) -> Result<Self, Box<dyn Error>> {
-        let root: serde_yaml::Value = serde_yaml::from_str(src)?;
-        let palette = root.get("palette").unwrap_or(&root);
+    /// Fails if a colour is missing or malformed.
+    pub fn from_yaml(src: &str) -> Result<Self, Base16Error> {
+        Self::from_yaml_named(src, "base16")
+    }
 
-        let mut c = [Color32::PLACEHOLDER; 16];
-        for (i, slot) in c.iter_mut().enumerate() {
-            let key = format!("base{i:02X}");
-            let hex = palette
-                .get(&key)
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| format!("missing colour `{key}`"))?;
-            *slot = parse_hex(hex)?;
+    /// Parses a scheme; one without a name is called `fallback_name`.
+    ///
+    /// The name is leaked, because themes are keyed by `&'static str`; that's a few bytes per
+    /// scheme the user chooses to load.
+    ///
+    /// # Errors
+    /// Fails if a colour is missing or malformed.
+    pub fn from_yaml_named(src: &str, fallback_name: &str) -> Result<Self, Base16Error> {
+        let mut name = None;
+        let mut variant = None;
+        let mut c: [Option<Color32>; 16] = [None; 16];
+
+        for line in src.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            let Some((key, value)) = line.split_once(':') else {
+                continue;
+            };
+            let key = key.trim().trim_matches(['"', '\'']);
+            let value = yaml_scalar(value);
+
+            match key {
+                "name" | "scheme" => name = Some(value),
+                "variant" => variant = Some(value.to_ascii_lowercase()),
+                _ => {
+                    // Ignore keys that aren't `base00`..`base0F` (e.g. Base24's `base10`+).
+                    if let Some(hex) = key.strip_prefix("base").filter(|h| h.len() == 2)
+                        && let Ok(i) = usize::from_str_radix(hex, 16)
+                        && i < c.len()
+                    {
+                        c[i] = Some(
+                            parse_hex(&value)
+                                .map_err(|e| Base16Error::Parse(format!("{key}: {e}")))?,
+                        );
+                    }
+                }
+            }
         }
 
-        let name = root
-            .get("name")
-            .or_else(|| root.get("scheme"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("base16")
-            .to_owned();
+        let missing: Vec<String> = (0..16)
+            .filter(|&i| c[i].is_none())
+            .map(|i| format!("base{i:02X}"))
+            .collect();
+        if !missing.is_empty() {
+            return Err(Base16Error::Parse(format!(
+                "missing {}",
+                missing.join(", ")
+            )));
+        }
+        let c: [Color32; 16] = c.map(|x| x.unwrap_or(Color32::PLACEHOLDER));
 
-        // Use the `variant` field if present, otherwise guess from base00's luminance.
-        let is_dark = match root.get("variant").and_then(|v| v.as_str()) {
+        // Prefer an explicit `variant`; otherwise judge by base00 (the background).
+        let is_dark = match variant.as_deref() {
             Some("dark") => true,
             Some("light") => false,
             _ => luminance(c[0]) < 0.5_f32,
         };
 
+        let name = name.unwrap_or_else(|| fallback_name.to_owned());
         Ok(Self {
             name: Box::leak(name.into_boxed_str()),
             is_dark,
@@ -131,13 +223,23 @@ impl Base16 {
     }
 }
 
-fn parse_hex(s: &str) -> Result<Color32, Box<dyn Error>> {
+/// The value of a `key: value` line: unquoted, without any trailing comment.
+fn yaml_scalar(v: &str) -> String {
+    let v = v.trim();
+    if let Some(q) = v.chars().next().filter(|&c| c == '"' || c == '\'') {
+        return v[1..].split(q).next().unwrap_or("").to_owned();
+    }
+    v.split(" #").next().unwrap_or("").trim().to_owned()
+}
+
+/// Parses `rrggbb` or `#rrggbb`.
+fn parse_hex(s: &str) -> Result<Color32, String> {
     let h = s.trim().trim_start_matches('#');
     // Checking for ASCII hex digits first also makes the byte-index slicing below safe.
     if h.len() != 6 || !h.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return Err(format!("expected 6 hex digits, got `{s}`").into());
+        return Err(format!("expected 6 hex digits, got `{s}`"));
     }
-    let p = |i: usize| u8::from_str_radix(&h[i..i + 2], 16);
+    let p = |i: usize| u8::from_str_radix(&h[i..i + 2], 16).map_err(|e| e.to_string());
     Ok(Color32::from_rgb(p(0)?, p(2)?, p(4)?))
 }
 
@@ -267,5 +369,85 @@ mod tests {
     fn luminance_is_between_zero_and_one() {
         assert!(luminance(Color32::BLACK).abs() < f32::EPSILON);
         assert!((luminance(Color32::WHITE) - 1.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn yaml_scalar_forms() {
+        assert_eq!(yaml_scalar("  plain  "), "plain");
+        assert_eq!(yaml_scalar("\"double quoted\""), "double quoted");
+        assert_eq!(yaml_scalar("'single quoted'"), "single quoted");
+        assert_eq!(yaml_scalar("value # trailing comment"), "value");
+        assert_eq!(yaml_scalar("\"with # hash\" # comment"), "with # hash");
+        assert_eq!(yaml_scalar(""), "");
+        assert_eq!(yaml_scalar("\"unterminated"), "unterminated");
+    }
+
+    #[test]
+    fn hex_colours() {
+        assert_eq!(parse_hex("ff8000"), Ok(Color32::from_rgb(255, 128, 0)));
+        assert_eq!(parse_hex("#FF8000"), Ok(Color32::from_rgb(255, 128, 0)));
+        assert_eq!(parse_hex(" 000000 "), Ok(Color32::from_rgb(0, 0, 0)));
+        for bad in ["", "fff", "ff800000", "gg0000", "+f0000", "-f0000"] {
+            assert!(parse_hex(bad).is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn missing_name_uses_the_fallback() {
+        let src = old_layout("000000").replace("scheme: \"Old\"\n", "");
+        assert_eq!(Base16::from_yaml(&src).unwrap().name, "base16");
+        assert_eq!(Base16::from_yaml_named(&src, "mine").unwrap().name, "mine");
+    }
+
+    #[test]
+    fn all_missing_colours_are_listed() {
+        let src = old_layout("000000")
+            .replace("base03:", "x03:")
+            .replace("base0F:", "x0F:");
+        let err = Base16::from_yaml(&src).unwrap_err().to_string();
+        assert!(err.contains("base03") && err.contains("base0F"), "{err}");
+    }
+
+    #[test]
+    fn a_bad_colour_names_its_key() {
+        let err = Base16::from_yaml(&old_layout("zzzzzz"))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("base00"), "{err}");
+    }
+
+    #[test]
+    fn base24_extras_comments_and_blank_lines_are_ignored() {
+        let src = format!(
+            "# comment\n\n{}base10: \"000000\"\nbase17: \"ffffff\"\n# trailing\n",
+            old_layout("000000")
+        );
+        assert!(Base16::from_yaml(&src).is_ok());
+    }
+
+    #[test]
+    fn variant_is_case_insensitive() {
+        let src = new_layout("variant: \"DARK\"\n", "ffffff");
+        assert!(Base16::from_yaml(&src).unwrap().is_dark);
+    }
+
+    #[test]
+    fn from_file_names_a_nameless_scheme_after_the_file() {
+        let dir = std::env::temp_dir().join(format!("base16-test-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("my-scheme.yaml");
+        fs::write(&path, old_layout("000000").replace("scheme: \"Old\"\n", "")).unwrap();
+        assert_eq!(Base16::from_file(&path).unwrap().name, "my-scheme");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn errors_have_display_and_source() {
+        let io = Base16::from_file("/definitely/not/here.yaml").unwrap_err();
+        assert!(matches!(io, Base16Error::Io(_)));
+        assert!(io.source().is_some());
+        let parse = Base16::from_yaml("").unwrap_err();
+        assert!(parse.source().is_none());
+        assert!(!parse.to_string().is_empty());
     }
 }

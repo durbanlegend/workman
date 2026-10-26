@@ -5,11 +5,19 @@ edition.workspace = true   # Inherits the Rust 2024 Edition
 authors.workspace = true   # Inherits your author info
 rust-version = "1.95"
 description = "A fast, lightweight, multi-lingual GUI markdown viewer"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/durbanlegend/workman"
+license.workspace = true
+repository.workspace = true
 readme = "README.md"
 keywords = ["markdown", "viewer", "gui", "egui"]
 categories = ["command-line-utilities", "gui"]
+# Keep the published package to what is needed to build, test and document it.
+exclude = [
+    ".github/",
+    "dist-workspace.toml",
+    "app.log",
+    "assets/icon_orig.png",
+    "assets/icon_left.png",
+]
 
 [workspace]
 members = [
@@ -22,12 +30,13 @@ members = [
 edition = "2024" # Centralises edition 2024 so internal crates can inherit it
 version = "0.1.0"
 authors = ["Don Forbes <don.forbes3@gmail.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/durbanlegend/workman"
 
 [workspace.dependencies]
 # Define external crates used throughout your workspace here
 eframe = { version = "0.37", features = ["wgpu"] }
 quote = "1.0"
-serde_yaml = "0.9"
 syn = { version = "3.0", features = ["full"] }
 
 [package.metadata.i18n]
@@ -40,11 +49,9 @@ name = "workman"
 path = "src/main.rs"
 
 [dependencies]
-base16 = { path = "crates/base16" }
+base16 = { package = "workman-base16", path = "crates/base16", version = "0.1.0" }
 chrono = "0.4"
 dirs = "7"
-documented = "0.10"
-edit = "0.1"
 eframe = { version = "0.37", features = ["wgpu"] }
 ego-tree = "0.11.0"
 egui_commonmark = { version = "0.26", features = ["better_syntax_highlighting", "svg", "fetch"] }
@@ -52,8 +59,7 @@ egui_extras = { version = "0.37", features = ["svg", "syntect"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 fontdb = { version = "0.23", features = ["fs"] }
 log = "0.4"
-macros = { path = "crates/macros" }
-mockall = "0.15"
+macros = { package = "workman-macros", path = "crates/macros", version = "0.1.0" }
 notify = "8"
 phf = { version = "0.14", features = ["macros"] }
 pulldown-cmark = "0.13"
@@ -62,8 +68,6 @@ rfd = "0.15"
 rust-i18n = "4"
 scraper = "0.27.0"
 serde = "1"
-serde_yaml = "0.9"
-strum = "0.28"
 # Pinned to ensure it won't pull a newer fancy-regex without us changing ours below:
 syntect = { version = "=5.3.0", default-features = false, features = ["default-fancy"] }
 sys-locale = "0.3"

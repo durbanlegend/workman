@@ -1,11 +1,18 @@
 [package]
+name = "workman-base16"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description = "Base16 colour scheme parsing and egui theming, for the workman markdown viewer"
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+keywords = ["base16", "egui", "theme", "colour-scheme"]
+categories = ["gui"]
+
+[lib]
+# Keep the short name used throughout the code.
 name = "base16"
-version.workspace = true   # Inherits version 0.1.0 from the root
-edition.workspace = true   # Inherits the Rust 2024 Edition
-authors.workspace = true   # Inherits your author info
 
 [dependencies]
-# If base16 needs external packages (e.g., serde), add them here:
-# serde = { version = "1.0", features = ["derive"] }
 eframe = { workspace = true }
-serde_yaml = { workspace = true }
